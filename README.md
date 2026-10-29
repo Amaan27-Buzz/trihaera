@@ -125,6 +125,24 @@ python scripts/replicate_pretrained.py --device cuda --seeds 17,23,42 --steps 10
 
 The 135M SmolLM2 checkpoint and WikiText-2 dataset are already cached from the first pilot. Results remain **not FLOP-matched**, and this is a pretrained adapter study, not TRIHAERA foundation pretraining.
 
+## Persistent-state research track (new)
+
+**Three-seed SmolLM2 results:** mixed layer-local adapters achieved mean WikiText-2 validation NLL **3.38814** vs **3.39523** without mixing, but took **30.58s vs 18.48s** training per 100-step run. The mean advantage of −0.00709 NLL is small, seed-dependent and not compute-matched. **Do not scale this old layer-local mixer.**
+
+The new `src/trihaera/persistent.py` prototype retains a shared complex three-state carrier across all **30 frozen pretrained decoder depths**, performs a nonlinear state update before each subsequent mixing operation, and introduces output correction only through a zero-initialized projection. This avoids the previous immediate mixer/readout linear reduction. **It is still a sidecar, not a full three-state Transformer**, and has no influence on the pretrained backbone's attention.
+
+The cached 135M weights are reused; no new large download. Test on your RTX 5060:
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/smoke_persistent.py --device cuda --mode mixed --output artifacts/persistent_mixed_smoke.json
+python scripts/smoke_persistent.py --device cuda --mode no_mixing --output artifacts/persistent_no_mixing_smoke.json
+```
+
+The smoke verifies exact original-logit parity, gradient flow, training time and GPU memory. It does **not** measure held-out language quality. Read [Persistent-state research](docs/PERSISTENT_STATE.md) and [current checkpoint](docs/PROJECT_STATE.md).
+
 ## Evaluation standard
 
 Measure trainable parameters, FLOPs, training tokens, validation loss, inference latency, throughput and VRAM separately. Include dense, recurrent/shared-weight and interference-disabled baselines; predeclare meaningful thresholds and avoid cherry-picking. A negative research outcome is valid. **Do not claim quantum speedups or model-quality gains without evidence.**
