@@ -8,8 +8,8 @@
 
 | Stage | Current status |
 |---|---|
-| 1. Architecture research/formalization | **IN PROGRESS — specification v0.2 and representation diagnostics added** |
-| 2. Reference implementation | **STARTED — CPU and local NVIDIA CUDA correctness pass** |
+| 1. Architecture research/formalization | **IN PROGRESS — rank/phase audit, pretrained experiment selection** |
+| 2. Reference implementation | **STARTED — local CUDA tests passed; pretrained residual adapter code committed but not yet tested on owner's GPU** |
 | 3. Compute-matched architectural validation | Not started |
 | 4. Training recipe research | Not started |
 | 5. 500–700M foundation pretraining | Not started |
@@ -36,10 +36,20 @@
 5. Stage 1 prior-art review now includes phase-coherent Transformers and PRISM (2026), increasing novelty risk.
 6. Added read-only diagnostic probe of effective rank, overlap, energy fractions and coherent recombination, with interference-on/off controls. **Owner's GPU probe output is not yet available**.
 
+## Confirmed representation probe on owner's RTX 5060 (2026-10-30)
+
+With seed 17 and 369,378 parameters, the untrained model had effective state rank **1.000 at input**, then **1.128, 1.204, 1.222** with mixing. Mean pairwise overlap after block 3 was **0.929**. Without mixing final rank was **1.227** (slightly higher). Mixed and unmixed logits differed by RMS **0.001512**. This is evidence of high *initial* redundancy; it does not establish the learned potential of the channels or predict downstream quality.
+
+## Chosen initial pretrained adaptation target
+
+**HuggingFaceTB/SmolLM2-135M Base**, Apache-2.0 model weights (~270 MB), Llama-style architecture. Stage 1/2 bridge adds trainable three-state residuals to a frozen original model with exactly preserved starting logits. Real and no-mixer controls included. **This is a derived model**; it is not the independent 500–700M foundation model. The residual adapter does not preserve three-state coherence end to end across layers.
+
+Local mocked-backbone tests passed **13/13** prior to commit; full Hugging Face model compatibility, owner's CUDA results, actual loss comparisons and hardware costs are still unverified. See [PRETRAINED_ADAPTATION.md](PRETRAINED_ADAPTATION.md).
+
 ## Next actions
 
-1. Owner: `git pull --ff-only origin main`, remove only TRIHAERA's stale copied Levis editable .pth, run `python -m pytest -q` and `python scripts/probe_states.py --device cuda`.
-2. Inspect resulting per-block state effective ranks and interference on/off logit difference; record observations without overinterpreting random-init data.
+1. Owner: `git pull --ff-only origin main`, run pytest and the new `scripts/smoke_pretrained.py --device cuda` with SmolLM2-135M. Install small Transformers dependencies in TRIHAERA's .venv only if missing.
+2. Record pretrained-adapter parity, exact model revision, parameter counts and peak VRAM; resolve any Transformers compatibility issues.
 3. Implement and measure strong controls (plain complex shared weights, real six-channel, frozen phase, state-count variants); report measured memory and compute.
 4. Complete mathematical comparisons, decide how to make three state channels actually nonredundant, and set the Stage 3 gate.
 5. Only after architecture validation and a researched, costed training method, attempt full 500–700M foundation pretraining and instruction-tune the same checkpoint.

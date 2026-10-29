@@ -1,0 +1,69 @@
+# TRIHAERA pretrained-weight adaptation track
+
+**Status:** Stage 1/2 experimental bridge; not a trained TRIHAERA model.  
+**First checkpoint:** [HuggingFaceTB/SmolLM2-135M](https://huggingface.co/HuggingFaceTB/SmolLM2-135M) (BASE, Apache-2.0).  
+**Why 135M:** ~270MB pretrained checkpoint, 30 Llama-style decoder layers, 576 hidden width, grouped-query attention and RoPE; suitable for first 8GB-VRAM compatibility tests. Larger 360M and ~600M checkpoints come later if justified. Model's *weights* are permissively licensed; do not claim its entire training corpus is independently licensed/fully reproducible without auditing it.
+
+## Research choice
+
+The owner's October 30, 2026, *untrained* state probe reported:
+- Rank: 1.00 at input; 1.128, 1.204 and 1.222 after three blocks.
+- Pairwise overlap: 1.00 at input and ~0.929 by block 3.
+- Interference-enabled vs disabled logits: RMS ~0.001512.
+- The mixing-disabled control had **slightly higher** final rank (~1.227), so higher initial diversity cannot be attributed to the mixer.
+
+This supports a concern that initial states are mostly redundant, but no conclusion about learned representations, perplexity or efficiency is possible. Training and matched baselines are required.
+
+## First adaptation implementation
+
+`src/trihaera/pretrained.py` retains the real pretrained Llama decoder in full, freezes its weights, wraps each block, and attaches **trainable low-rank residuals**. The adapter's real down/up projections are shared across three classical complex state channels. State-dependent phases and a 3x3 unitary mixer provide an experimental computation path. Its output projection starts at zero, so the pretrained logits must be **bit-for-bit identical before training**. Backprop then trains only the adapters.
+
+A clear limit: these three states are **formed and recombined within each residual adapter**, not maintained as a persistent superposition through all pretrained layers. The resulting model is a **SmolLM2-derived architecture experiment**, NOT from-scratch TRIHAERA-650M Base. It cannot establish the original hypothesis on its own.
+
+Controls provided:
+- `trihaera`: three-state low-rank residual with learned mixing;
+- `no_mixing`: same computational states, mixer disabled;
+- `real_adapter`: ordinary low-rank SiLU residual control.
+
+The real adapter has slightly fewer parameters (no phase/mixer). Exact count is logged; even near-equal parameter counts **do not** imply compute matching.
+
+## RTX 5060 Windows smoke
+
+From `D:\Programming\03_Projects\personal-projects\05_ML\trihaera`:
+
+```powershell
+git pull --ff-only origin main
+.\.venv\Scripts\Activate.ps1
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python -m pip show transformers safetensors
+```
+
+If **Transformers or safetensors is missing**, install **inside TRIHAERA only**:
+
+```powershell
+python -m pip install 'transformers>=4.45,<6' safetensors
+```
+
+No new PyTorch installation is required. Transformers may need to obtain a few small dependencies, but **the first SmolLM2 run will download ~270 MB of pretrained weights** from Hugging Face. Model weights are cached outside this repository. Repeated runs should reuse that cache.
+
+```powershell
+python scripts/smoke_pretrained.py --device cuda --mode trihaera --output artifacts/smollm2_135m_trihaera_smoke.json
+python scripts/smoke_pretrained.py --device cuda --mode real_adapter --output artifacts/smollm2_135m_real_adapter_smoke.json
+python scripts/smoke_pretrained.py --device cuda --mode no_mixing --output artifacts/smollm2_135m_no_mixing_smoke.json
+```
+
+First run requires network access. It checks baseline logit equality at initialization, adapter-only two-step gradient updates, trainable parameter count, elapsed time and peak allocated CUDA memory. It **does not train a usable language model** or measure real effectiveness.
+
+Do not commit upstream weights, cache, sensitive raw data, or `artifacts/` to GitHub.
+
+## Proposed next controlled development
+
+1. Verify compatibility with the owner's actual Transformers version and 8GB RTX 5060.
+2. Record exact pretrained model revision (commit SHA), tokenizer and license to make subsequent runs reproducible.
+3. Freeze a held-out corpus and tokenization for tests; define contamination and provenance policy.
+4. Compare base-only, plain real adapter, no-mixing three-state and full three-state using equal trainable parameter budgets, identical training tokens, multiple seeds and *measured* GPU time/memory.
+5. Reconcile difference between residual adapter prototype and persistent-state TRIHAERA architecture. If adaptation does not provide evidence, do not misrepresent it as a new pretrained model.
+6. Stage 1 exit remains gated on mathematical formalization and Stage 3 validation design; first 500–700M from-scratch base is conditional on evidence and compute.
+
+Reference: [original SmolLM2 repository](https://github.com/huggingface/smollm/tree/main/text), [model card](https://huggingface.co/HuggingFaceTB/SmolLM2-135M).

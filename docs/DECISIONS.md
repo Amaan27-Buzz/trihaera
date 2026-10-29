@@ -15,3 +15,8 @@
 | T-009 | Keep Stage 1 IN PROGRESS | Missing GPU probe, rigorous novelty audit, cost estimates, go/no-go threshold | Exit checklist completed and reviewed |
 
 Conclusions must be revisable based on results, including negative ones. No fabricated benchmark claims.
+
+| T-010 | Adapt SmolLM2-135M Base first (Apache-2.0 pretrained weights) | Small, architecturally compatible, less compute and ~270MB download | Fails local compatibility/VRAM or better fully reproducible target |
+| T-011 | Start with a zero-initialized low-rank residual rather than destructive weight remapping | Preserve pretrained logits exactly; isolate intervention | Stable state-aware full-weight conversion demonstrates superior transfer |
+| T-012 | Treat three-state residual adapters as an intermediate bridge, not full TRIHAERA | States are formed/recombined inside each layer, not persistent end to end | Implement a verified persistent-state decoder, with compatible checkpoints |
+| T-013 | Always retain base/no-mixer/real-adapter controls | Pretrained knowledge or additional adapter FLOPs alone can explain gains | Stronger controls supersede these |

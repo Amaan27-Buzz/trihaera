@@ -2,7 +2,7 @@
 
 **Dawnlight Labs — experimental three-state, quantum-inspired Transformer**
 
-**Current state: Stage 1 (architecture research and formalization) in progress.** Stage 2 exploratory code passed initial tests on the owner's RTX 5060 (2026-10-30). This is not a trained language model or a demonstrated architecture advantage.
+**Current state: Stage 1 architecture research in progress; Stage 2 exploratory implementation in progress.** The owner's RTX 5060 passed initial correctness tests and a random-initialization representation probe. There is no demonstrated architectural advantage or trained TRIHAERA language model.
 
 TRIHAERA investigates whether three simultaneously represented classical complex-amplitude channels, labelled **−1, 0, +1**, combined through state interference and shared Transformer weights, can achieve superior language-model quality per parameter **and** per unit of computation.
 
@@ -29,7 +29,7 @@ These are **classically simulated amplitudes, not actual quantum hardware superp
 | 7 | Research documentation, evaluations and public release | Not started |
 | 8 | Optimization, scaling and integrations | Not started |
 
-Full plans: [Roadmap](docs/ROADMAP.md) · [Project state](docs/PROJECT_STATE.md) · [Architecture](docs/ARCHITECTURE.md) · [Research decisions](docs/DECISIONS.md) · [Experiment protocol](docs/EXPERIMENT_PROTOCOL.md) · [Prior art](docs/PRIOR_ART.md).
+Full plans: [Roadmap](docs/ROADMAP.md) · [Project state](docs/PROJECT_STATE.md) · [Architecture](docs/ARCHITECTURE.md) · [Pretrained adaptation](docs/PRETRAINED_ADAPTATION.md) · [Research decisions](docs/DECISIONS.md) · [Experiment protocol](docs/EXPERIMENT_PROTOCOL.md) · [Prior art](docs/PRIOR_ART.md).
 
 ## Development
 
@@ -74,6 +74,22 @@ if (Test-Path $LevisEditable) { Remove-Item -LiteralPath $LevisEditable }
 ```
 
 Never remove anything inside Levis's original environment. New bootstrap runs sanitize copied Levis editable .pth references automatically.
+
+## Pretrained adaptation research track
+
+The first weight-bearing experiment will adapt **[HuggingFaceTB/SmolLM2-135M Base](https://huggingface.co/HuggingFaceTB/SmolLM2-135M)** (Apache-2.0, approx. 270 MB). This is deliberately **a derived model experiment**, not the future independently pretrained 500–700M TRIHAERA foundation model.
+
+A three-state low-rank residual can be inserted between the original Llama-style blocks while keeping pretrained weights frozen and **exactly preserving baseline logits at initialization**. Controls include an ordinary real adapter and three-state processing without mixing. This preliminary adapter **does not** carry state amplitudes coherently through all layers.
+
+Pull the latest `main`, then:
+
+```powershell
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/smoke_pretrained.py --device cuda --mode trihaera --output artifacts/smollm2_135m_trihaera_smoke.json
+```
+
+The first pretrained smoke downloads approximately 270 MB once and requires `transformers` and `safetensors` inside TRIHAERA's independent `.venv`. For installation checks, controls, licensing and limitations, read [Pretrained adaptation](docs/PRETRAINED_ADAPTATION.md).
 
 ## Evaluation standard
 

@@ -56,3 +56,7 @@ Only if evidence warrants: 1B/3B/7B+, better inference kernels, KV cache and lon
 - Tiny correctness tests are permitted; tiny synthetic loss alone cannot validate reasoning or broad language capabilities.
 - Parameter matching and FLOP matching must be reported separately.
 - Work on main only. No branches/PRs without an explicit instruction.
+
+## Opportunistic pretrained-model adaptation (cross-cutting Stage 1/2 study)
+
+A limited, separate research track now tests SmolLM2-135M BASE weights with a small three-state residual adapter, a no-mixer ablation and a real-valued adapter control. Its purpose is **architectural compatibility and transfer feasibility**, not a claim to have independently pretrained a TRIHAERA foundation model. The original 500–700M from-scratch model remains conditional on the Stage 3 validation gate and Stage 4 compute/data plan. See [pretrained adaptation](PRETRAINED_ADAPTATION.md).
