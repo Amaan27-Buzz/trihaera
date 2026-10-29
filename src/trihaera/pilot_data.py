@@ -6,6 +6,8 @@ foundation-model training pipeline.
 
 import hashlib
 import random
+import sys
+from array import array
 
 import torch
 
@@ -48,7 +50,12 @@ def pack_text_windows(rows, tokenizer, *, sequence_length: int,
     windows = torch.tensor(used_ids, dtype=torch.long).reshape(
         window_count, sequence_length
     )
-    checksum = hashlib.sha256(windows.numpy().tobytes()).hexdigest()
+    # Avoid an undeclared NumPy runtime dependency in CPU-only CI.
+    # Use explicit little-endian uint64 tokens for a platform-stable checksum.
+    raw = array("Q", used_ids)
+    if sys.byteorder != "little":
+        raw.byteswap()
+    checksum = hashlib.sha256(raw.tobytes()).hexdigest()
     return windows, {
         "num_windows": window_count,
         "sequence_length": sequence_length,
