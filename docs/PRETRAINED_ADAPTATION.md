@@ -67,3 +67,41 @@ Do not commit upstream weights, cache, sensitive raw data, or `artifacts/` to Gi
 6. Stage 1 exit remains gated on mathematical formalization and Stage 3 validation design; first 500–700M from-scratch base is conditional on evidence and compute.
 
 Reference: [original SmolLM2 repository](https://github.com/huggingface/smollm/tree/main/text), [model card](https://huggingface.co/HuggingFaceTB/SmolLM2-135M).
+
+## October 30, 2026 — first real CUDA SmolLM2 checkpoint
+
+Owner confirmed:
+- Windows PyTorch 2.14.0+cu130 / Transformers 5.18.0 / CUDA RTX 5060 8GB;
+- All 29 unit tests passed;
+- 30 wrapped decoder layers with 553,680 adapter parameters (0.41% of ~135M total);
+- Exact initial logit parity (max difference **0**);
+- Two steps on 23 tokens, initial loss **2.418364**, elapsed **1.466s**, allocated peak **375,484,416 bytes**;
+- **Post-step RMS logit change 9.25787** at the OLD learning rate **1e-3** and no gradient clipping.
+
+This initial compatibility check is not evidence of a quality gain. The large output drift is a practical **stability concern**, not a result to optimize for. We have not yet measured validation loss or prediction fidelity after updates.
+
+## Stabilized adapter configuration
+
+New `StateResidual` applies an explicit **residual_scale=0.1** to the trainable adapter output; the zero-initialized output projection still leaves pretrained logits exactly unchanged at initialization. New smoke uses **AdamW lr=3e-4**, **gradient norm clipping=1.0**, and deterministic eval mode to avoid dropout confounds. The no-mixing control now freezes inactive mixer weights and does not count them as trainable. Compare against the original high-drift checkpoint using **normalized logit RMS drift** and held-out language-model loss, not just the ability to change outputs.
+
+Run the stabilized smoke:
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/smoke_pretrained.py --device cuda --mode trihaera --output artifacts/smollm2_stable_smoke.json
+```
+
+Then run the first **small-data held-out** adapter pilot. [WikiText-2 raw](https://huggingface.co/datasets/Salesforce/wikitext) provides official independent train and validation splits. Its documented licenses include CC BY-SA 3.0 and GFDL; using it for an experiment is not a blanket license claim for redistributing derived training data.
+
+```powershell
+python -m pip show datasets
+# Only if missing:
+python -m pip install datasets
+python scripts/pilot_pretrained.py --device cuda --steps 20 --batch-size 1 --sequence-length 128 --output artifacts/pilot_135m.json
+```
+
+The script downloads the WikiText-2 raw split on first run (small relative to the 270MB model). It uses deterministic text packing, a frozen unmodified SmolLM2 baseline, identical optimizer and training token order across three modes, and separately reports initial/validation loss, gradient norms, trainable parameter count, training time and peak allocated GPU memory.
+
+**These are preliminary controls, NOT fair equal-FLOP/equal-parameter scientific validation.** Training-data overlap with the pretrained model is also possible; the held-out split protects only against contamination from this pilot's own training steps. No decision to scale should be based on the outcome of just 20 steps.

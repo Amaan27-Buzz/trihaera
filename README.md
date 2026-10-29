@@ -91,6 +91,23 @@ python scripts/smoke_pretrained.py --device cuda --mode trihaera --output artifa
 
 The first pretrained smoke downloads approximately 270 MB once and requires `transformers` and `safetensors` inside TRIHAERA's independent `.venv`. For installation checks, controls, licensing and limitations, read [Pretrained adaptation](docs/PRETRAINED_ADAPTATION.md).
 
+## Next controlled local experiment
+
+Your previous first CUDA integration passed (29 tests, exact initial parity), but produced a **9.26 RMS logit change after just two steps with lr=1e-3**. This is a stability warning, not improved capability.
+
+The new bridge uses a scaled residual (0.1), 3e-4 learning rate, gradient clipping and fixes inactive control parameter counts. For first held-out experiments with **WikiText-2 raw** independent train/validation splits (license: CC BY-SA / GFDL), run:
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/smoke_pretrained.py --device cuda --mode trihaera --output artifacts/smollm2_stable_smoke.json
+# If needed in TRIHAERA's own .venv: python -m pip install datasets
+python scripts/pilot_pretrained.py --device cuda --steps 20 --batch-size 1 --sequence-length 128 --output artifacts/pilot_135m.json
+```
+
+The pilot compares original frozen-model validation loss against three separately trained adapters on identical data/token budgets. It is **not FLOP-matched**, is not a 500–700M pretraining run, and is not proof of improved model quality. Details: [Pretrained adaptation](docs/PRETRAINED_ADAPTATION.md).
+
 ## Evaluation standard
 
 Measure trainable parameters, FLOPs, training tokens, validation loss, inference latency, throughput and VRAM separately. Include dense, recurrent/shared-weight and interference-disabled baselines; predeclare meaningful thresholds and avoid cherry-picking. A negative research outcome is valid. **Do not claim quantum speedups or model-quality gains without evidence.**

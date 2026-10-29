@@ -44,7 +44,7 @@ With seed 17 and 369,378 parameters, the untrained model had effective state ran
 
 **HuggingFaceTB/SmolLM2-135M Base**, Apache-2.0 model weights (~270 MB), Llama-style architecture. Stage 1/2 bridge adds trainable three-state residuals to a frozen original model with exactly preserved starting logits. Real and no-mixer controls included. **This is a derived model**; it is not the independent 500–700M foundation model. The residual adapter does not preserve three-state coherence end to end across layers.
 
-Local mocked-backbone tests passed **13/13** prior to commit; full Hugging Face model compatibility, owner's CUDA results, actual loss comparisons and hardware costs are still unverified. See [PRETRAINED_ADAPTATION.md](PRETRAINED_ADAPTATION.md).
+Local mocked-backbone tests passed **13/13** before the first real Hugging Face GPU run. **Owner's SmolLM2 compatibility test succeeded; held-out quality comparisons and compute-matched analysis remain unverified.** See [PRETRAINED_ADAPTATION.md](PRETRAINED_ADAPTATION.md).
 
 ## Next actions
 
@@ -57,3 +57,16 @@ Local mocked-backbone tests passed **13/13** prior to commit; full Hugging Face 
 See [architecture](ARCHITECTURE.md), [prior art](PRIOR_ART.md), [experiments](EXPERIMENT_PROTOCOL.md), [roadmap](ROADMAP.md).
 
 **Do not advance the stage or claim superior intelligence based on 15 training steps or an effective-rank statistic.**
+
+## First SmolLM2 CUDA integration results — 2026-10-30
+
+- SmolLM2-135M Base loaded from official HF checkpoint (~269 MB).
+- Transformers 5.18.0, safetensors 0.8.0, PyTorch 2.14.0+cu130.
+- 29 unit tests pass; all 30 pretrained decoder layers wrapped with the three-state residual adapter.
+- 553,680 trainable adapter params, total 135,068,688; initial max logits difference **0**.
+- On a **single 23-token text**, two AdamW steps using old lr=1e-3 produced **RMS logit drift 9.25787** in 1.47 seconds; allocated CUDA memory peak ~375 MB.
+- Loss 2.418 was the **initial training loss**, not held-out NLL; no established language gain.
+- **Concern:** excessive short-run logit drift; new code uses residual_scale 0.1, lr 3e-4, gradient clipping 1.0 and adds held-out WikiText-2 controls.
+- Owner has not yet run the stabilized smoke or the small-data controlled pilot.
+
+Next: run new smoke; if initial parity remains exact and gradient/output statistics reasonable, run equal-token preliminary comparisons across real adapter, no-mixing and TRIHAERA. Stage 1 remains **IN PROGRESS**, not complete.

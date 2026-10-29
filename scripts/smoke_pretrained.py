@@ -27,9 +27,15 @@ def main() -> None:
     parser.add_argument("--max-length", type=int, default=64)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--seed", type=int, default=23)
+    parser.add_argument("--steps", type=int, default=2)
+    parser.add_argument("--learning-rate", type=float, default=0.0003)
+    parser.add_argument("--residual-scale", type=float, default=0.1)
+    parser.add_argument("--clip-norm", type=float, default=1.0)
     args = parser.parse_args()
-    if args.rank < 1 or not 4 <= args.max_length <= 256:
-        parser.error("rank >= 1, max-length within [4,256] required")
+    if (args.rank < 1 or not 4 <= args.max_length <= 256 or args.steps < 1
+            or not 0 < args.learning_rate <= 0.01 or not 0 < args.residual_scale <= 1
+            or not 0 < args.clip_norm < float("inf")):
+        parser.error("Invalid smoke configuration")
     if args.model != DEFAULT_MODEL:
         parser.error("Only the vetted SmolLM2-135M base is enabled in this first pilot")
 
@@ -68,7 +74,8 @@ def main() -> None:
     with torch.inference_mode():
         reference = model(input_ids=ids, use_cache=False).logits.detach().clone()
 
-    report = attach_adapters(model, rank=args.rank, mode=args.mode)
+    report = attach_adapters(model, rank=args.rank, mode=args.mode,
+                             residual_scale=args.residual_scale)
     with torch.no_grad():
         initial = model(input_ids=ids, use_cache=False).logits
     max_diff = (initial.float() - reference.float()).abs().max().item()
@@ -77,11 +84,14 @@ def main() -> None:
             f"Initial adaptation unexpectedly changed logits: {max_diff}"
         )
 
-    optimizer = torch.optim.AdamW(list(adapter_parameters(model)), lr=1e-3)
-    model.train()
+    parameters = list(adapter_parameters(model))
+    optimizer = torch.optim.AdamW(parameters, lr=args.learning_rate, weight_decay=0.0)
+    # Eval mode disables dropout but autograd and adapter training remain active.
+    model.eval()
     before = None
+    gradient_norms = []
     start = time.perf_counter()
-    for step in range(2):
+    for step in range(args.steps):
         optimizer.zero_grad(set_to_none=True)
         # Next-token loss uses the pretrained model's causal-LM shift.
         loss = model(input_ids=ids, labels=ids, use_cache=False).loss
@@ -90,6 +100,10 @@ def main() -> None:
         if step == 0:
             before = float(loss.item())
         loss.backward()
+        grad_norm = torch.nn.utils.clip_grad_norm_(
+            parameters, args.clip_norm, error_if_nonfinite=True
+        )
+        gradient_norms.append(float(grad_norm.item()))
         optimizer.step()
     if device.type == "cuda":
         torch.cuda.synchronize()
@@ -114,13 +128,21 @@ def main() -> None:
         **report,
         "initial_max_logit_difference": max_diff,
         "initial_training_loss": before,
-        "post_two_step_logit_rms_change": output_change,
-        "two_step_elapsed_seconds": elapsed,
+        "post_training_logit_rms_change": output_change,
+        "initial_logit_rms": float(reference.float().square().mean().sqrt().item()),
+        "logit_rms_change_to_base_rms_ratio": output_change / max(
+            1e-8, float(reference.float().square().mean().sqrt().item())
+        ),
+        "steps": args.steps,
+        "learning_rate": args.learning_rate,
+        "gradient_clip_norm": args.clip_norm,
+        "max_preclip_gradient_norm": max(gradient_norms),
+        "training_elapsed_seconds": elapsed,
         "max_cuda_allocated_bytes": (
             torch.cuda.max_memory_allocated() if device.type == "cuda" else None
         ),
         "warning": (
-            "Two steps on one short sample are only a compatibility test, "
+            "A few steps on one short sample are only a compatibility test, "
             "not evidence of quality"
         ),
     }

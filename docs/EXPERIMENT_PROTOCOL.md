@@ -43,3 +43,9 @@ Use held-out language data and multiple seeds. Predeclare a meaningful effect th
 Log commit SHA, configs, data source/license/hash, tokenizer, GPU and torch version, precision, seeds, params, peak VRAM, training tokens, estimated/measured FLOPs, losses, downstream evals and negative results.
 
 **Go/no-go:** if any advantage is explained by FLOPs, width or ordinary mixing, revise or stop the architecture; do not upscale because three states sound novel.
+
+## Stage 1/2 bridge: small WikiText-2 adapter pilot
+
+As a preliminary stability and transfer experiment, `scripts/pilot_pretrained.py` compares a completely frozen SmolLM2-135M baseline, a small real-valued residual adapter, a no-mixing three-state adapter, and the mixed three-state adapter. All use the same official WikiText-2 raw train and validation splits, deterministic token packing and training-window order, identical training steps/learning rate/clip norm, and frozen pretrained backbone.
+
+**Not scientifically decisive:** This pilot has only 20 steps by default, and the modes differ in extra compute and slightly in parameters. Dataset content might overlap SmolLM2's *original pretraining data*. Positive results require replication with data provenance controls, multiple seeds, wider baselines and **separate FLOP/latency matching**. Keep failure data and null results.

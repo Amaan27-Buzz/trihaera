@@ -108,3 +108,43 @@ def test_unsupported_output_does_not_silently_continue():
     wrapper = DecoderLayerWithStateAdapter(BadLayer(), StateResidual(8))
     with pytest.raises(TypeError):
         wrapper(torch.zeros(1, 3, 8))
+
+
+@pytest.mark.parametrize("mode", ["trihaera", "no_mixing", "real_adapter"])
+def test_adapter_residual_scale_and_exact_initial_identity(mode):
+    torch.manual_seed(33)
+    original = FakeLM()
+    model = copy.deepcopy(original)
+    input_values = torch.randn(2, 4, 12)
+    report = attach_adapters(model, rank=4, mode=mode, residual_scale=0.1)
+    assert report["residual_scale"] == 0.1
+    torch.testing.assert_close(model(input_values), original(input_values),
+                               atol=0, rtol=0)
+    for wrapper in model.model.layers:
+        assert wrapper.adapter.residual_scale == 0.1
+
+
+def test_inactive_mixer_is_not_trainable_or_counted():
+    model = FakeLM()
+    stats = attach_adapters(model, mode="no_mixing")
+    for wrapper in model.model.layers:
+        assert not any(p.requires_grad for p in wrapper.adapter.mix.parameters())
+    assert sum(p.numel() for p in adapter_parameters(model)) == stats["trainable_parameters"]
+
+
+def test_invalid_residual_scale_rejected():
+    for value in [0.0, -0.01, 1.1]:
+        with pytest.raises(ValueError):
+            StateResidual(8, 4, residual_scale=value)
+
+
+def test_residual_scale_controls_amplitude():
+    torch.manual_seed(33)
+    small = StateResidual(12, 4, mode="real_adapter", residual_scale=0.1)
+    large = copy.deepcopy(small)
+    large.residual_scale = 1.0
+    with torch.no_grad():
+        small.up.weight.fill_(0.02)
+        large.up.weight.copy_(small.up.weight)
+    values = torch.randn(2, 4, 12)
+    torch.testing.assert_close(10 * small(values), large(values), atol=1e-6, rtol=1e-5)

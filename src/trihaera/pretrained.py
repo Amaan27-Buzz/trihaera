@@ -26,13 +26,16 @@ class StateResidual(nn.Module):
     """
 
     def __init__(self, hidden_size: int, rank: int = 16,
-                 mode: AdapterMode = "trihaera") -> None:
+                 mode: AdapterMode = "trihaera", residual_scale: float = 0.1) -> None:
         super().__init__()
         if hidden_size < 1 or rank < 1:
             raise ValueError("hidden_size and rank must be positive")
         if mode not in ("trihaera", "no_mixing", "real_adapter"):
             raise ValueError(f"Unknown adapter mode: {mode}")
+        if not (0 < residual_scale <= 1):
+            raise ValueError("residual_scale must be in (0, 1]")
         self.mode = mode
+        self.residual_scale = float(residual_scale)
         self.down = nn.Linear(hidden_size, rank, bias=False)
         self.up = nn.Linear(rank, hidden_size, bias=False)
         nn.init.normal_(self.down.weight, mean=0.0, std=0.02)
@@ -41,6 +44,9 @@ class StateResidual(nn.Module):
             self.phases = nn.Parameter(torch.tensor([-0.6, 0.0, 0.6]))
             self.phase_step = nn.Parameter(torch.tensor([-0.2, 0.0, 0.2]))
             self.mix = PhaseInterference(enabled=mode == "trihaera")
+            if mode == "no_mixing":
+                for parameter in self.mix.parameters():
+                    parameter.requires_grad_(False)
 
     def forward(self, hidden: torch.Tensor) -> torch.Tensor:
         # Using float32 for the adapter avoids unsupported bf16 complex kernels;
@@ -60,7 +66,7 @@ class StateResidual(nn.Module):
             )
             z = self.mix(z)
             transformed = z.sum(dim=-2).real / math.sqrt(3)
-        return self.up(transformed).to(dtype=hidden.dtype)
+        return (self.residual_scale * self.up(transformed)).to(dtype=hidden.dtype)
 
 
 class DecoderLayerWithStateAdapter(nn.Module):
@@ -84,7 +90,8 @@ class DecoderLayerWithStateAdapter(nn.Module):
 
 
 def attach_adapters(model: nn.Module, *, rank: int = 16,
-                    mode: AdapterMode = "trihaera", freeze_backbone: bool = True) -> dict:
+                    mode: AdapterMode = "trihaera", freeze_backbone: bool = True,
+                    residual_scale: float = 0.1) -> dict:
     """Attach to a HF Llama-style CausalLM without replacing original weights.
 
     All original layers must be under model.model.layers and expose hidden_size.
@@ -102,12 +109,13 @@ def attach_adapters(model: nn.Module, *, rank: int = 16,
         for parameter in model.parameters():
             parameter.requires_grad_(False)
     for i, old_layer in enumerate(layers):
-        adapter = StateResidual(hidden_size, rank, mode)
+        adapter = StateResidual(hidden_size, rank, mode, residual_scale=residual_scale)
         device = next(old_layer.parameters()).device
         layers[i] = DecoderLayerWithStateAdapter(old_layer, adapter.to(device=device))
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
-    return {"mode": mode, "rank": rank, "layers": len(layers),
+    return {"mode": mode, "rank": rank, "residual_scale": residual_scale,
+            "layers": len(layers),
             "trainable_parameters": trainable, "total_parameters": total,
             "trainable_fraction": trainable / total}
 
@@ -115,4 +123,4 @@ def attach_adapters(model: nn.Module, *, rank: int = 16,
 def adapter_parameters(model: nn.Module):
     for module in model.modules():
         if isinstance(module, DecoderLayerWithStateAdapter):
-            yield from module.adapter.parameters()
+            yield from (p for p in module.adapter.parameters() if p.requires_grad)

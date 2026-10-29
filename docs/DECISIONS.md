@@ -20,3 +20,7 @@ Conclusions must be revisable based on results, including negative ones. No fabr
 | T-011 | Start with a zero-initialized low-rank residual rather than destructive weight remapping | Preserve pretrained logits exactly; isolate intervention | Stable state-aware full-weight conversion demonstrates superior transfer |
 | T-012 | Treat three-state residual adapters as an intermediate bridge, not full TRIHAERA | States are formed/recombined inside each layer, not persistent end to end | Implement a verified persistent-state decoder, with compatible checkpoints |
 | T-013 | Always retain base/no-mixer/real-adapter controls | Pretrained knowledge or additional adapter FLOPs alone can explain gains | Stronger controls supersede these |
+
+| T-014 | Stabilize adapters using residual scale=0.1, AdamW lr=3e-4, clip=1.0 | First 23-token CUDA run changed logits RMS=9.25787 after only two steps | Reassess after held-out drift/loss and learning curves |
+| T-015 | Use WikiText-2 raw train/validation for first small-data pilot | Lightweight real language corpus with explicit splits; not a training-recipe claim | Better curated, license-compatible corpus and multi-seed tests |
+| T-016 | Record unused mixer parameters as frozen in no-mixing control | Inactive weights are not trainable capacity | Alternative control implementation |
