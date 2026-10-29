@@ -132,3 +132,25 @@ State count 3 is an **arbitrary design hypothesis**, not theoretically optimal; 
 - [ ] Predeclare sufficiently strong ablation controls and a Stage 3 go/no-go threshold informed by baseline variance
 
 **Conclusion:** Stage 1 remains IN PROGRESS. Current reference code demonstrates a testable mechanism, not an original breakthrough.
+
+## 8. Formal negative result: pretrained adapter mixer is readout-reducible (2026-10-30)
+
+This result concerns **only** the pretrained residual adapter, not the original three-state decoder whose mixer is followed by more nonlinearity in the *next* block.
+
+In `StateResidual`, state transforms `z_s` are separately computed from the same low-rank input, followed by unitary 3×3 mixing `z'_o = sum_s U[o,s] z_s` and immediate state readout `y = Re(sum_o z'_o)/sqrt(3)`.
+
+By rearranging finite sums:
+
+```text
+y = Re( sum_o sum_s U[o,s] z_s ) / sqrt(3)
+  = Re( sum_s (sum_o U[o,s]) z_s ) / sqrt(3)
+  = Re( w · z ) / sqrt(3),       w_s = sum_o U[o,s]
+```
+
+Consequently the observable effect of the learned 3×3 matrix depends only on **3 complex coefficients** `w`. Unitarity further constrains `||w||_2=sqrt(3)`. Any norm-`sqrt(3)` complex vector can be realized as such a projection under some 3×3 unitary U, so this is a constrained learned readout, **not a general three-state interaction in the adapter**.
+
+The algebra is exact. Forward and gradient equivalence (within floating-point tolerance) are tested by `mode="collapsed_mixing"`. Computational reduction may improve runtime, but it does not create additional model capacity. This identifies redundant mixer parameterization: different matrices U can give identical readouts.
+
+**Important nuance:** The complete stand-alone TRIHAERA decoder *does* apply its mixer between successive nonlinear Transformer blocks; this specific collapse proof does not apply to the entire decoder. Whether that decoder gains useful quality remains unproven.
+
+**Development consequence:** Do not promote the current pretrained 3×3 adapter as a fundamental superposition breakthrough. Continue the adaptation as a controlled engineering bridge and design a genuine persistent-state / cross-state nonlinear mechanism with appropriate real-valued baselines.

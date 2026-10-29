@@ -148,3 +148,51 @@ def test_residual_scale_controls_amplitude():
         large.up.weight.copy_(small.up.weight)
     values = torch.randn(2, 4, 12)
     torch.testing.assert_close(10 * small(values), large(values), atol=1e-6, rtol=1e-5)
+
+
+def test_mixer_collapses_to_three_complex_readout_coefficients():
+    torch.manual_seed(80)
+    original = StateResidual(12, 5, mode="trihaera")
+    collapsed = StateResidual(12, 5, mode="collapsed_mixing")
+    collapsed.load_state_dict(original.state_dict(), strict=True)
+    with torch.no_grad():
+        original.up.weight.normal_(0.0, 0.03)
+        collapsed.up.weight.copy_(original.up.weight)
+        original.mix.symmetric.normal_(0.0, 0.1)
+        original.mix.skew.normal_(0.0, 0.1)
+        collapsed.mix.load_state_dict(original.mix.state_dict())
+    x = torch.randn(2, 7, 12)
+    out_original = original(x)
+    out_collapsed = collapsed(x)
+    torch.testing.assert_close(out_original, out_collapsed, atol=2e-6, rtol=1e-5)
+
+
+def test_collapsed_readout_and_full_mixer_have_equivalent_gradients():
+    torch.manual_seed(91)
+    original = StateResidual(10, 4, mode="trihaera")
+    collapsed = StateResidual(10, 4, mode="collapsed_mixing")
+    original.up.weight.data.normal_(0, 0.1)
+    original.mix.symmetric.data.normal_(0, 0.1)
+    original.mix.skew.data.normal_(0, 0.1)
+    collapsed.load_state_dict(original.state_dict())
+    x = torch.randn(2, 5, 10)
+    original(x).square().sum().backward()
+    collapsed(x).square().sum().backward()
+    for (name_a, parameter_a), (name_b, parameter_b) in zip(
+        original.named_parameters(), collapsed.named_parameters()
+    ):
+        assert name_a == name_b
+        assert parameter_a.grad is not None and parameter_b.grad is not None
+        torch.testing.assert_close(
+            parameter_a.grad, parameter_b.grad, atol=2e-5, rtol=1e-4,
+        )
+
+
+def test_collapsed_mode_preserves_exact_base_predictions():
+    torch.manual_seed(98)
+    base = FakeLM()
+    adapted = copy.deepcopy(base)
+    inputs = torch.randn(2, 5, 12)
+    report = attach_adapters(adapted, mode="collapsed_mixing", rank=4)
+    assert report["mode"] == "collapsed_mixing"
+    torch.testing.assert_close(base(inputs), adapted(inputs), atol=0, rtol=0)

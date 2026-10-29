@@ -105,3 +105,30 @@ python scripts/pilot_pretrained.py --device cuda --steps 20 --batch-size 1 --seq
 The script downloads the WikiText-2 raw split on first run (small relative to the 270MB model). It uses deterministic text packing, a frozen unmodified SmolLM2 baseline, identical optimizer and training token order across three modes, and separately reports initial/validation loss, gradient norms, trainable parameter count, training time and peak allocated GPU memory.
 
 **These are preliminary controls, NOT fair equal-FLOP/equal-parameter scientific validation.** Training-data overlap with the pretrained model is also possible; the held-out split protects only against contamination from this pilot's own training steps. No decision to scale should be based on the outcome of just 20 steps.
+
+## Owner: first WikiText-2 validation results — 2026-10-30
+
+All 38 unit tests passed locally on RTX 5060; stable 2-step smoke kept exact initial logits, reduced post-update logit drift to **0.63579 RMS** (relative to base logit RMS **9.99494**). This reflects changes to residual scale, optimizer and clipping together, not a controlled isolated causal attribution.
+
+First pilot used one seed, **20 steps × batch 1 × sequence length 128**, **256 training windows and 12 validation windows**:
+- Frozen pretrained base held-out NLL **3.45328**
+- Real adapter: **3.39929**; 552,960 trainable params; **2.39 s**
+- Three-state with no mixer: **3.34908**; 553,140 trainable params; **3.07 s**
+- Three-state with learned mixer: **3.35118**; 553,680 trainable params; **4.83 s**
+
+The no-mixing three-state model won on this tiny trial. Mixing produced a worse loss (+0.00210 NLL vs no mixing), ~1.57× the training time, and no demonstrated added capability. Training time is not FLOP-matching and can vary with GPU clocks, kernels and cache.
+
+### Structural reduction and follow-up
+
+The 3×3 unitary adapter mixer is followed immediately by a sum over state channels. Algebraically, its effect is **exactly reducible** to three complex coefficients (a constrained complex readout). This explains why we must not overinterpret the unitary matrix as cross-state reasoning. The `collapsed_mixing` adapter is mathematically equivalent, and forward/gradient tests are included.
+
+For stronger evidence without downloading a new model or dataset:
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/replicate_pretrained.py --device cuda --seeds 17,23,42 --steps 100 --eval-windows 64 --output artifacts/replication_135m.json
+```
+
+This separately trains real, no-mixing and TRIHAERA mixer adapters at equal token exposures, fixed hyperparameters, and common seeded data order, reports all seed-level outcomes and descriptive paired standard deviations. It logs throughput, peak CUDA memory and training time, **not matched FLOPs**. A positive single-seed result does not justify scaling; a null result means redirect the mechanism toward persistent states interacting before subsequent nonlinearities.

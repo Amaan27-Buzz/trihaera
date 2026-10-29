@@ -49,3 +49,13 @@ Log commit SHA, configs, data source/license/hash, tokenizer, GPU and torch vers
 As a preliminary stability and transfer experiment, `scripts/pilot_pretrained.py` compares a completely frozen SmolLM2-135M baseline, a small real-valued residual adapter, a no-mixing three-state adapter, and the mixed three-state adapter. All use the same official WikiText-2 raw train and validation splits, deterministic token packing and training-window order, identical training steps/learning rate/clip norm, and frozen pretrained backbone.
 
 **Not scientifically decisive:** This pilot has only 20 steps by default, and the modes differ in extra compute and slightly in parameters. Dataset content might overlap SmolLM2's *original pretraining data*. Positive results require replication with data provenance controls, multiple seeds, wider baselines and **separate FLOP/latency matching**. Keep failure data and null results.
+
+## 2026-10-30 first pilot measurements (owner-supplied)
+
+Single-seed held-out WikiText-2, 20 steps and 12 validation windows: frozen base 3.45328 NLL, real adapter 3.39929, no-mixing 3.34908, learned mixer 3.35118. Wall times 2.39/3.07/4.83 seconds respectively. **The mixed variant did not win.** These time measurements are not FLOP counts and do not imply rigorous efficiency rankings.
+
+### Replication protocol (new)
+
+`scripts/replicate_pretrained.py` uses the SAME model checkpoint and token packing for all variants. It draws from official WikiText-2 train/validation splits, records source fingerprints/window hashes, trains across default seeds 17, 23, 42, uses 100 steps, and expands validation to 64 windows. It records seed-paired NLL differences against no-mixing, sample standard deviations, train wall times, parameter counts and CUDA peak allocation. It saves output after each run for recovery review.
+
+The variants are still not FLOP matched and have a small parameter-count difference. These runs are **diagnostic replication**, not confirmatory experimental evidence. The collapsed-mixing implementation can optionally be added with `--modes real_adapter,no_mixing,trihaera,collapsed_mixing` to verify the math on pretrained data. Do not interpret a 3-seed descriptive mean as a statistical significance test.

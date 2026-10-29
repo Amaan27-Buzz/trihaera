@@ -1,72 +1,49 @@
-# TRIHAERA — authoritative development checkpoint
+# TRIHAERA — authoritative project checkpoint
 
-**Updated:** 2026-10-30  
+**Date:** 2026-10-30  
 **Repository:** Amaan27-Buzz/trihaera  
-**Authorized working branch:** **main ONLY**; no new branches/PRs without owner's explicit request.
+**Branch rule:** **main only**, no side branches or pull requests unless explicitly authorized.
 
-## Stage status
+## Stages
 
-| Stage | Current status |
-|---|---|
-| 1. Architecture research/formalization | **IN PROGRESS — rank/phase audit, pretrained experiment selection** |
-| 2. Reference implementation | **STARTED — local CUDA tests passed; pretrained residual adapter code committed but not yet tested on owner's GPU** |
-| 3. Compute-matched architectural validation | Not started |
-| 4. Training recipe research | Not started |
-| 5. 500–700M foundation pretraining | Not started |
-| 6. Chat instruction tuning of same checkpoint | Not started |
-| 7. Research/public release | Not started |
-| 8. Optimization/scaling | Not started |
+- **Stage 1 (architecture research): IN PROGRESS.** Mathematical operator v0.2, basic rank tests, phase analysis and *new adapter mixer-collapse proof*. Novelty and practical benefit remain unproven.
+- **Stage 2 (reference implementation): STARTED.** Stand-alone three-state decoder and a distinct pretrained-model adapter bridge pass GPU compatibility and unit tests.
+- **Stages 3–8:** NOT STARTED, including compute-matched comparisons, research-derived training recipe, 500–700M from-scratch base model and instruction-tuned version.
 
-## Confirmed owner local results (2026-10-30)
+## Owner's verified machine
 
-- Windows PowerShell environment cloning resumed successfully. 45,625 files, ~3.763 GB copied from Levis's **site-packages** into independent TRIHAERA `.venv`, no PyTorch download or Levis modification.
-- Local TRIHAERA Python: `D:\Programming\03_Projects\personal-projects\05_ML\trihaera\.venv\Scripts\python.exe`.
-- PyTorch **2.14.0+cu130**, CUDA detected NVIDIA **RTX 5060 Laptop GPU (8 GB)**.
-- Initial 10 correctness unit tests passed on CPU, 5.94 s.
-- CUDA smoke: TRIHAERA **369,378** params, loss **5.5251**; dense **369,312** params, loss **5.5003** (untrained random initialization; NOT a capability comparison).
-- CUDA 15-step fixed-sequence optimizer sanity: TRIHAERA loss **3.8787→3.2051**, dense loss **3.8786→3.2095** (toy sequence memorization, NOT language-model performance).
-- One copied editable `.pth` file referenced Levis: `__editable__.levis_mk1-0.1.0.pth`. Remove that **copy inside TRIHAERA only**; do not alter Levis.
+- Windows under `D:\Programming\03_Projects\personal-projects\05_ML\trihaera`; independent .venv cloned from Levis, Levis editable .pth link removed.
+- PyTorch 2.14.0+cu130, Transformers 5.18.0, datasets 5.1.0, safetensors 0.8.0, RTX 5060 Laptop GPU (8GB).
+- **38 unit tests passed** locally before latest multi-seed changes.
+- Standalone untrained three-state rank: input 1.000, blocks 1.128, 1.204, 1.222; no mixer 1.227 at last block; output RMS difference 0.001512. Initial representations largely redundant.
 
-## Research findings
+## SmolLM2-135M Base adaptation experiments (derived model, not pretrained TRIHAERA)
 
-1. Input three-state representation is mathematically rank one (three phase copies of one embedding).
-2. Unitary mixing cannot independently increase linear rank; diversity must be learned through state-conditional residuals and nonlinearities.
-3. Classically simulated three-complex-state activations can be represented as six real channels, thus no automatic quantum speedup or memory compression.
-4. Conventional causal attention remains phase-covariant under a uniform state-specific phase; that is a restriction on how interference can help.
-5. Stage 1 prior-art review now includes phase-coherent Transformers and PRISM (2026), increasing novelty risk.
-6. Added read-only diagnostic probe of effective rank, overlap, energy fractions and coherent recombination, with interference-on/off controls. **Owner's GPU probe output is not yet available**.
+- 30 Llama-style pretrained layers, original weights frozen.
+- Three-state residual rank=16, ~553,680 adapter parameters (~0.41% total). Exact initial pretrained output parity.
+- Original 2-step (lr 1e-3) logit drift RMS **9.25787** on 23 tokens.
+- Stabilized 2-step (lr 3e-4, residual_scale 0.1, grad_clip 1.0) logit drift RMS **0.63579**, base logits RMS **9.99494**, one input example. No quality claim.
+- First actual held-out WikiText-2 pilot, **single seed, 20 steps, 12 validation windows**:
+  - Frozen base validation NLL **3.45328**
+  - Real adapter **3.39929**, 552,960 trainable parameters, 2.39s
+  - Three-state without mixer **3.34908**, 553,140 trainable parameters, 3.07s
+  - Three-state with mixer **3.35118**, 553,680 trainable parameters, 4.83s
+- **Mixer did not improve held-out loss** in the pilot; no-mixing was marginally better, mixed model ~57% slower. Samples and steps are too few for broad claims.
 
-## Confirmed representation probe on owner's RTX 5060 (2026-10-30)
+## Stage 1 mathematical negative finding
 
-With seed 17 and 369,378 parameters, the untrained model had effective state rank **1.000 at input**, then **1.128, 1.204, 1.222** with mixing. Mean pairwise overlap after block 3 was **0.929**. Without mixing final rank was **1.227** (slightly higher). Mixed and unmixed logits differed by RMS **0.001512**. This is evidence of high *initial* redundancy; it does not establish the learned potential of the channels or predict downstream quality.
+The pretrained adapter constructs three complex channels and applies a 3×3 unitary U **immediately before summation**. The result reduces algebraically to a three-coefficient complex readout `w=1^T U`. It is not a persistent state mixer between nonlinear computations. Exact forward and backward equivalence are now encoded in tests and the optional `collapsed_mixing` mode. This reduction **does not automatically apply** to the standalone decoder's inter-layer state mixer.
 
-## Chosen initial pretrained adaptation target
+## Immediate next action
 
-**HuggingFaceTB/SmolLM2-135M Base**, Apache-2.0 model weights (~270 MB), Llama-style architecture. Stage 1/2 bridge adds trainable three-state residuals to a frozen original model with exactly preserved starting logits. Real and no-mixer controls included. **This is a derived model**; it is not the independent 500–700M foundation model. The residual adapter does not preserve three-state coherence end to end across layers.
+1. Pull latest main; run `python -m pytest -q` (including new collapse tests).
+2. Run three-seed 100-step replicated WikiText-2 adapter experiment via `scripts/replicate_pretrained.py`, 64 validation windows, on owner's CUDA GPU; model/dataset cached.
+3. Inspect seed-paired NLL differences, train time, gradients and peak memory; do not infer from mean alone.
+4. If learned mixing remains no better than no-mixing or real adapter, **reject this adapter mixer as the architectural innovation**, and prototype *persistent state interactions before subsequent nonlinear layers*.
+5. Keep original 500–700M from-scratch base and derived chat checkpoint conditional on a decisive Stage 3 architecture validation and a researched costed Stage 4 training plan.
 
-Local mocked-backbone tests passed **13/13** before the first real Hugging Face GPU run. **Owner's SmolLM2 compatibility test succeeded; held-out quality comparisons and compute-matched analysis remain unverified.** See [PRETRAINED_ADAPTATION.md](PRETRAINED_ADAPTATION.md).
+## Key documentation
 
-## Next actions
+[Architecture](ARCHITECTURE.md) · [Pretrained pilot](PRETRAINED_ADAPTATION.md) · [Experiment protocol](EXPERIMENT_PROTOCOL.md) · [Research decisions](DECISIONS.md) · [Roadmap](ROADMAP.md).
 
-1. Owner: `git pull --ff-only origin main`, run pytest and the new `scripts/smoke_pretrained.py --device cuda` with SmolLM2-135M. Install small Transformers dependencies in TRIHAERA's .venv only if missing.
-2. Record pretrained-adapter parity, exact model revision, parameter counts and peak VRAM; resolve any Transformers compatibility issues.
-3. Implement and measure strong controls (plain complex shared weights, real six-channel, frozen phase, state-count variants); report measured memory and compute.
-4. Complete mathematical comparisons, decide how to make three state channels actually nonredundant, and set the Stage 3 gate.
-5. Only after architecture validation and a researched, costed training method, attempt full 500–700M foundation pretraining and instruction-tune the same checkpoint.
-
-See [architecture](ARCHITECTURE.md), [prior art](PRIOR_ART.md), [experiments](EXPERIMENT_PROTOCOL.md), [roadmap](ROADMAP.md).
-
-**Do not advance the stage or claim superior intelligence based on 15 training steps or an effective-rank statistic.**
-
-## First SmolLM2 CUDA integration results — 2026-10-30
-
-- SmolLM2-135M Base loaded from official HF checkpoint (~269 MB).
-- Transformers 5.18.0, safetensors 0.8.0, PyTorch 2.14.0+cu130.
-- 29 unit tests pass; all 30 pretrained decoder layers wrapped with the three-state residual adapter.
-- 553,680 trainable adapter params, total 135,068,688; initial max logits difference **0**.
-- On a **single 23-token text**, two AdamW steps using old lr=1e-3 produced **RMS logit drift 9.25787** in 1.47 seconds; allocated CUDA memory peak ~375 MB.
-- Loss 2.418 was the **initial training loss**, not held-out NLL; no established language gain.
-- **Concern:** excessive short-run logit drift; new code uses residual_scale 0.1, lr 3e-4, gradient clipping 1.0 and adds held-out WikiText-2 controls.
-- Owner has not yet run the stabilized smoke or the small-data controlled pilot.
-
-Next: run new smoke; if initial parity remains exact and gradient/output statistics reasonable, run equal-token preliminary comparisons across real adapter, no-mixing and TRIHAERA. Stage 1 remains **IN PROGRESS**, not complete.
+No benchmarks yet show a parameter-/compute-matched TRIHAERA architectural advantage, longer context, reduced hallucinations or 36-layer-equivalent reasoning.

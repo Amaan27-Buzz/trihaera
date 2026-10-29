@@ -108,6 +108,23 @@ python scripts/pilot_pretrained.py --device cuda --steps 20 --batch-size 1 --seq
 
 The pilot compares original frozen-model validation loss against three separately trained adapters on identical data/token budgets. It is **not FLOP-matched**, is not a 500–700M pretraining run, and is not proof of improved model quality. Details: [Pretrained adaptation](docs/PRETRAINED_ADAPTATION.md).
 
+## Next: replicated architecture-control experiment (Stage 1)
+
+The first small held-out WikiText-2 pilot (one seed, 20 steps, 12 validation windows) gave validation NLL of **3.39929** for the real adapter, **3.34908** for the three-state no-mixing adapter and **3.35118** for TRIHAERA's mixer, from a frozen-base **3.45328**. Mixer training took **4.83 s**, versus **3.07 s** without mixing and **2.39 s** for the real adapter. **This does not support an advantage from the current mixer.**
+
+Moreover, the layerwise pretrained adapter sums the state channels *immediately after the unitary mixer*. Mathematically, that full mixer reduces exactly to a **3-coefficient complex readout** at that location. No persistent multi-state computation occurs across pretrained layers. See [architecture analysis](docs/ARCHITECTURE.md).
+
+The new `collapsed_mixing` implementation and tests verify this reduction. The next study compares adapter variations across paired random seeds on more real held-out text:
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/replicate_pretrained.py --device cuda --seeds 17,23,42 --steps 100 --eval-windows 64 --output artifacts/replication_135m.json
+```
+
+The 135M SmolLM2 checkpoint and WikiText-2 dataset are already cached from the first pilot. Results remain **not FLOP-matched**, and this is a pretrained adapter study, not TRIHAERA foundation pretraining.
+
 ## Evaluation standard
 
 Measure trainable parameters, FLOPs, training tokens, validation loss, inference latency, throughput and VRAM separately. Include dense, recurrent/shared-weight and interference-disabled baselines; predeclare meaningful thresholds and avoid cherry-picking. A negative research outcome is valid. **Do not claim quantum speedups or model-quality gains without evidence.**

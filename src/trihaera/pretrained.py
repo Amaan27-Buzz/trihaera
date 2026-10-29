@@ -15,7 +15,7 @@ from torch.nn import functional as F
 
 from .layers import PhaseInterference
 
-AdapterMode = Literal["trihaera", "no_mixing", "real_adapter"]
+AdapterMode = Literal["trihaera", "collapsed_mixing", "no_mixing", "real_adapter"]
 
 
 class StateResidual(nn.Module):
@@ -30,7 +30,7 @@ class StateResidual(nn.Module):
         super().__init__()
         if hidden_size < 1 or rank < 1:
             raise ValueError("hidden_size and rank must be positive")
-        if mode not in ("trihaera", "no_mixing", "real_adapter"):
+        if mode not in ("trihaera", "collapsed_mixing", "no_mixing", "real_adapter"):
             raise ValueError(f"Unknown adapter mode: {mode}")
         if not (0 < residual_scale <= 1):
             raise ValueError("residual_scale must be in (0, 1]")
@@ -64,8 +64,16 @@ class StateResidual(nn.Module):
             z = z + step.view(1, 1, 3, 1) * torch.complex(
                 F.silu(z.real), F.silu(z.imag)
             )
-            z = self.mix(z)
-            transformed = z.sum(dim=-2).real / math.sqrt(3)
+            if self.mode == "collapsed_mixing":
+                # Exact linear-algebra reduction:
+                # sum_o sum_i U[o,i] z[i] == sum_i (sum_o U[o,i]) z[i].
+                # This exposes that a mixer *immediately followed by state
+                # summation* has no persistent cross-state representation.
+                weights = self.mix.matrix().sum(dim=0)
+                combined = torch.einsum("s,btsr->btr", weights, z)
+            else:
+                combined = self.mix(z).sum(dim=-2)
+            transformed = combined.real / math.sqrt(3)
         return (self.residual_scale * self.up(transformed)).to(dtype=hidden.dtype)
 
 
