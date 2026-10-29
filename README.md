@@ -51,7 +51,7 @@ From PowerShell in the cloned TRIHAERA folder, one command creates the separate 
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_windows.ps1
 ```
 
-This creates `trihaera\.venv` using Levis's installed packages, without modifying Levis. For troubleshooting and manual steps, see the Windows environment setup document.
+This creates or safely resumes `trihaera\.venv` using Levis's installed packages, without modifying Levis. If the original bootstrap failed with `NameError: purelib`, pull the latest `main` and rerun this command without deleting the partially created environment. See the Windows environment setup document.
 
 Activate TRIHAERA's independent environment and run the checks:
 

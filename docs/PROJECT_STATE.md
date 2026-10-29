@@ -46,3 +46,9 @@ Levis package source: D:\Programming\03_Projects\personal-projects\05_ML\levis-m
 Local GPU: RTX 5060 Laptop GPU, 8GB VRAM.
 
 No automatic modifications to Levis; target TRIHAERA .venv must be independent. See docs/WINDOWS_SETUP.md.
+
+## Local environment bootstrap defect — 2026-10-30
+
+- First Windows bootstrap hit `NameError: name 'purelib' is not defined` because PowerShell 5.1 stripped nested quotes in a Python `-c` argument.
+- Root cause corrected by moving introspection into a separate Python script and supporting verified resume of a partially created target `.venv`.
+- Python helper and CPU prototype tests passed locally on the development host; **owner's Windows bootstrap/CUDA retest is pending**.
