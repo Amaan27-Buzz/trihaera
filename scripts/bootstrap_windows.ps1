@@ -70,6 +70,16 @@ $RoboCopyCode = $LASTEXITCODE
 $global:LASTEXITCODE = 0  # robocopy exit codes 0-7 mean success / skipped / differences
 if ($RoboCopyCode -ge 8) { throw "Package copy failed (robocopy exit code $RoboCopyCode)" }
 
+# Remove only .pth files copied into TRIHAERA that refer back to Levis.
+# Editable installs otherwise cross-link the projects despite separate venvs.
+Get-ChildItem -LiteralPath $TargetPackages -Filter '*.pth' -File | ForEach-Object {
+    $PthText = Get-Content -LiteralPath $_.FullName -Raw
+    if ($PthText -match 'levis-mk1') {
+        Write-Host "Removing Levis editable link from TRIHAERA: $($_.Name)"
+        Remove-Item -LiteralPath $_.FullName -Force
+    }
+}
+
 Write-Host 'Verifying standalone interpreter and PyTorch...'
 & $TargetPython $Probe verify
 if ($LASTEXITCODE -ne 0) { throw 'Standalone environment validation failed. You may rerun this bootstrap.' }

@@ -2,7 +2,7 @@
 
 **Dawnlight Labs — experimental three-state, quantum-inspired Transformer**
 
-**Current state: Stage 1 (architecture research and formalization) in progress.** A Stage 2 exploratory PyTorch prototype is included for correctness testing, not a trained language model or demonstrated architecture advantage.
+**Current state: Stage 1 (architecture research and formalization) in progress.** Stage 2 exploratory code passed initial tests on the owner's RTX 5060 (2026-10-30). This is not a trained language model or a demonstrated architecture advantage.
 
 TRIHAERA investigates whether three simultaneously represented classical complex-amplitude channels, labelled **−1, 0, +1**, combined through state interference and shared Transformer weights, can achieve superior language-model quality per parameter **and** per unit of computation.
 
@@ -29,7 +29,7 @@ These are **classically simulated amplitudes, not actual quantum hardware superp
 | 7 | Research documentation, evaluations and public release | Not started |
 | 8 | Optimization, scaling and integrations | Not started |
 
-Full plans: [Roadmap](docs/ROADMAP.md) · [Project state](docs/PROJECT_STATE.md) · [Architecture](docs/ARCHITECTURE.md) · [Experiment protocol](docs/EXPERIMENT_PROTOCOL.md) · [Prior art](docs/PRIOR_ART.md).
+Full plans: [Roadmap](docs/ROADMAP.md) · [Project state](docs/PROJECT_STATE.md) · [Architecture](docs/ARCHITECTURE.md) · [Research decisions](docs/DECISIONS.md) · [Experiment protocol](docs/EXPERIMENT_PROTOCOL.md) · [Prior art](docs/PRIOR_ART.md).
 
 ## Development
 
@@ -61,9 +61,19 @@ $env:PYTHONPATH = (Join-Path (Get-Location) 'src')
 python -m pytest -q
 python scripts/smoke.py --device cuda
 python scripts/train_sanity.py --device cuda --steps 15
+python scripts/probe_states.py --device cuda
 ```
 
-The tests/smoke runs confirm software correctness only. They do not establish language ability or empirical architectural value.
+The tests/smoke runs confirm software correctness only. The state probe reports per-block linear diversity (effective rank, energy and overlap) with interference enabled/disabled at the same random weights; it does not establish language ability.
+
+**Copied Levis editable-install warning:** If you created .venv with the previous bootstrap, remove only the copied editable .pth in TRIHAERA before probing:
+
+```powershell
+$LevisEditable = '.\.venv\Lib\site-packages\__editable__.levis_mk1-0.1.0.pth'
+if (Test-Path $LevisEditable) { Remove-Item -LiteralPath $LevisEditable }
+```
+
+Never remove anything inside Levis's original environment. New bootstrap runs sanitize copied Levis editable .pth references automatically.
 
 ## Evaluation standard
 

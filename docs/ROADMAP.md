@@ -6,7 +6,7 @@ These are research gates, not progress percentages. Stages may overlap where sen
 
 Specify classical three-state amplitude representation, shared weights, complex causal attention, state mixing, output readout, numerical properties, cost model and proposed novelty. Review nearest work on qutrit representations, complex attention, ALBERT, Universal Transformers and recursive/shared-weight networks.
 
-**Exit:** reviewed operator equations; testable claims and explicit null hypothesis; realistic originality position; ablation checklist.
+**Exit:** reviewed operator equations; tests of rank/symmetry assumptions; identified novelty risk and empirical null hypothesis; GPU representation and cost probes; preregistered ablation controls. **Status:** v0.2 equations, proofs and tests authored; owner GPU representation probe and more literature/compute analysis pending.
 
 ## Stage 2: Implement verified reference model (STARTED)
 

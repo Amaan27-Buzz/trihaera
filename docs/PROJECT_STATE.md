@@ -1,54 +1,49 @@
-# TRIHAERA — authoritative development state
+# TRIHAERA — authoritative development checkpoint
 
 **Updated:** 2026-10-30  
 **Repository:** Amaan27-Buzz/trihaera  
-**Authorized development branch:** main ONLY; no new branches or pull requests unless the owner asks.
+**Authorized working branch:** **main ONLY**; no new branches/PRs without owner's explicit request.
 
-## Current stage
+## Stage status
 
-- Stage 1 — Architecture research and formalization: **IN PROGRESS**.
-- Stage 2 — First experimental reference implementation: **STARTED**, awaiting owner's CUDA results.
-- Stages 3–8: **NOT STARTED**.
-- No model has been pretrained, instruction-tuned or validated against competitive baselines.
+| Stage | Current status |
+|---|---|
+| 1. Architecture research/formalization | **IN PROGRESS — specification v0.2 and representation diagnostics added** |
+| 2. Reference implementation | **STARTED — CPU and local NVIDIA CUDA correctness pass** |
+| 3. Compute-matched architectural validation | Not started |
+| 4. Training recipe research | Not started |
+| 5. 500–700M foundation pretraining | Not started |
+| 6. Chat instruction tuning of same checkpoint | Not started |
+| 7. Research/public release | Not started |
+| 8. Optimization/scaling | Not started |
 
-## Agreed product/research goals
+## Confirmed owner local results (2026-10-30)
 
-- Three concurrent, *classically simulated* complex state channels labelled −1, 0, +1.
-- Shared Transformer parameters and learnable phase-based state mixing.
-- Research goal: better quality/efficiency at fixed parameters and compute; the alleged equivalence of 12 to 36 layers is **not established**.
-- A trained 500–700M general-purpose text foundation model, provisional name TRIHAERA-650M-Base, conditional on architectural proof.
-- Chat model is a post-trained variant of that very same model, provisional TRIHAERA-650M-Instruct.
-- Scale further only with sufficient empirical evidence and training resources.
-- Independent Dawnlight Labs project, distinct from LEVIS and PLURIMENS.
+- Windows PowerShell environment cloning resumed successfully. 45,625 files, ~3.763 GB copied from Levis's **site-packages** into independent TRIHAERA `.venv`, no PyTorch download or Levis modification.
+- Local TRIHAERA Python: `D:\Programming\03_Projects\personal-projects\05_ML\trihaera\.venv\Scripts\python.exe`.
+- PyTorch **2.14.0+cu130**, CUDA detected NVIDIA **RTX 5060 Laptop GPU (8 GB)**.
+- Initial 10 correctness unit tests passed on CPU, 5.94 s.
+- CUDA smoke: TRIHAERA **369,378** params, loss **5.5251**; dense **369,312** params, loss **5.5003** (untrained random initialization; NOT a capability comparison).
+- CUDA 15-step fixed-sequence optimizer sanity: TRIHAERA loss **3.8787→3.2051**, dense loss **3.8786→3.2095** (toy sequence memorization, NOT language-model performance).
+- One copied editable `.pth` file referenced Levis: `__editable__.levis_mk1-0.1.0.pth`. Remove that **copy inside TRIHAERA only**; do not alter Levis.
 
-## Current code
+## Research findings
 
-- Config and conventional decoder baseline.
-- Three-state complex hidden representations, causal attention using shared real weights, phase-dependent residuals, and a 3×3 unitary state-mixing operator.
-- Minimal forward/backward, causality and interference tests; smoke and single-sequence optimizer sanity commands.
-- Tests on the author's initial scaffold were run on CPU; CUDA tests on owner's RTX 5060 8GB laptop **have not been run or confirmed**.
+1. Input three-state representation is mathematically rank one (three phase copies of one embedding).
+2. Unitary mixing cannot independently increase linear rank; diversity must be learned through state-conditional residuals and nonlinearities.
+3. Classically simulated three-complex-state activations can be represented as six real channels, thus no automatic quantum speedup or memory compression.
+4. Conventional causal attention remains phase-covariant under a uniform state-specific phase; that is a restriction on how interference can help.
+5. Stage 1 prior-art review now includes phase-coherent Transformers and PRISM (2026), increasing novelty risk.
+6. Added read-only diagnostic probe of effective rank, overlap, energy fractions and coherent recombination, with interference-on/off controls. **Owner's GPU probe output is not yet available**.
 
-## Remaining critical work
+## Next actions
 
-1. Owner clones main and creates a **separate** local .venv, copying installed packages from Levis (no PyTorch redownload), then tests CUDA and shares output.
-2. Audit whether state channels retain non-redundant information and whether the apparent interference has a conventional real-network equivalent.
-3. Measure parameter counts, FLOPs, peak VRAM, step time and mixed-precision limitations.
-4. Implement shared-weight/recurrent baseline and interference ablations; define experimental go/no-go before data runs.
-5. Design a true multi-seed, compute-matched validation benchmark. Avoid promoting tiny synthetic optimization tests as language capability.
-6. After evidence gate, research and formalize a credible training pipeline for the 500–700M foundation model.
+1. Owner: `git pull --ff-only origin main`, remove only TRIHAERA's stale copied Levis editable .pth, run `python -m pytest -q` and `python scripts/probe_states.py --device cuda`.
+2. Inspect resulting per-block state effective ranks and interference on/off logit difference; record observations without overinterpreting random-init data.
+3. Implement and measure strong controls (plain complex shared weights, real six-channel, frozen phase, state-count variants); report measured memory and compute.
+4. Complete mathematical comparisons, decide how to make three state channels actually nonredundant, and set the Stage 3 gate.
+5. Only after architecture validation and a researched, costed training method, attempt full 500–700M foundation pretraining and instruction-tune the same checkpoint.
 
-**Do not mark Stage 1 complete solely because code exists.**
+See [architecture](ARCHITECTURE.md), [prior art](PRIOR_ART.md), [experiments](EXPERIMENT_PROTOCOL.md), [roadmap](ROADMAP.md).
 
-## Hardware / location
-
-Windows project folder: D:\Programming\03_Projects\personal-projects\05_ML\trihaera  
-Levis package source: D:\Programming\03_Projects\personal-projects\05_ML\levis-mk1\.venv  
-Local GPU: RTX 5060 Laptop GPU, 8GB VRAM.
-
-No automatic modifications to Levis; target TRIHAERA .venv must be independent. See docs/WINDOWS_SETUP.md.
-
-## Local environment bootstrap defect — 2026-10-30
-
-- First Windows bootstrap hit `NameError: name 'purelib' is not defined` because PowerShell 5.1 stripped nested quotes in a Python `-c` argument.
-- Root cause corrected by moving introspection into a separate Python script and supporting verified resume of a partially created target `.venv`.
-- Python helper and CPU prototype tests passed locally on the development host; **owner's Windows bootstrap/CUDA retest is pending**.
+**Do not advance the stage or claim superior intelligence based on 15 training steps or an effective-rank statistic.**
