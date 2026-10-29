@@ -45,6 +45,14 @@ cd trihaera
 
 Create an **independent TRIHAERA virtual environment** while copying the installed Python packages from Levis (including PyTorch), rather than sharing Levis's environment or redownloading its dependencies. Follow [Windows environment setup](docs/WINDOWS_SETUP.md).
 
+From PowerShell in the cloned TRIHAERA folder, one command creates the separate environment and validates its PyTorch installation without downloading packages:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_windows.ps1
+```
+
+This creates `trihaera\.venv` using Levis's installed packages, without modifying Levis. For troubleshooting and manual steps, see the Windows environment setup document.
+
 With that local environment activated:
 
 ```powershell
