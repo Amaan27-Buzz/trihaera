@@ -5,9 +5,9 @@
 
 ## 1. What the model actually is
 
-TRIHAERA v0 is a **classically simulated complex-valued causal decoder** with exactly three simultaneous state channels indexed by (s\in\{-1,0,+1\}). It uses normal PyTorch GPU operations. The phase coordinates are *not* physical qutrits, quantum entanglement or an actual quantum circuit. The model does not implement a quantum measurement.
+TRIHAERA v0 is a **classically simulated complex-valued causal decoder** with exactly three simultaneous state channels indexed by `s ∈ {−1, 0, +1}`. It uses normal PyTorch GPU operations. The phase coordinates are *not* physical qutrits, quantum entanglement or an actual quantum circuit. The model does not implement a quantum measurement.
 
-Let (B,T,D,H,K) denote batch, time, hidden width, heads and number of layers. Input (x\in\mathbb{N}^{B\times T}). Learned token and absolute positional embeddings:
+Let `B, T, D, H, K` denote batch, time, hidden width, heads and number of layers. Input token IDs have shape `[B,T]`. Learned token and absolute positional embeddings:
 
 ```text
 e[b,t,:] = token_embedding[x[b,t]] + position_embedding[t]
@@ -19,7 +19,7 @@ This is a 3-channel **rank-one** state construction at input, not three independ
 
 ## 2. The implemented block, precisely
 
-For each block (l\in\{0,\ldots,K-1\}):
+For each block `l = 0, …, K−1`:
 
 1. Complex RMS normalization, with a shared learned real gain vector `g`:
 
