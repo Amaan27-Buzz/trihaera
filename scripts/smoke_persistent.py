@@ -22,7 +22,7 @@ MODEL_ID = "HuggingFaceTB/SmolLM2-135M"
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--mode", choices=("mixed", "no_mixing"), default="mixed")
+    parser.add_argument("--mode", choices=("mixed", "no_mixing", "real_six", "real_six_no_mixing"), default="mixed")
     parser.add_argument("--rank", type=int, default=16)
     parser.add_argument("--residual-scale", type=float, default=0.1)
     parser.add_argument("--steps", type=int, default=2)

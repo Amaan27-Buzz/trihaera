@@ -19,7 +19,7 @@ from torch.nn import functional as F
 
 from .layers import PhaseInterference, shared_complex_linear
 
-PersistentMode = Literal["mixed", "no_mixing"]
+PersistentMode = Literal["mixed", "no_mixing", "real_six", "real_six_no_mixing"]
 
 
 class PersistentStep(nn.Module):
@@ -58,6 +58,67 @@ class PersistentStep(nn.Module):
         return self.mix(state)
 
 
+class RealOrthogonalMixer(nn.Module):
+    """Trainable real 6x6 orthogonal state mixing via a skew generator."""
+
+    def __init__(self, enabled: bool = True) -> None:
+        super().__init__()
+        self.enabled = enabled
+        self.skew = nn.Parameter(torch.zeros(6, 6))
+        if not enabled:
+            self.skew.requires_grad_(False)
+        with torch.no_grad():
+            self.skew[0, 1] = 0.12
+            self.skew[2, 3] = -0.10
+            self.skew[4, 5] = 0.08
+
+    def matrix(self) -> torch.Tensor:
+        generator = (self.skew - self.skew.T) / 2
+        return torch.matrix_exp(generator)
+
+    def forward(self, state: torch.Tensor) -> torch.Tensor:
+        if state.shape[-2] != 6:
+            raise ValueError("Real recurrent control expects six channels")
+        if not self.enabled:
+            return state
+        return torch.einsum("oi,btir->btor", self.matrix(), state)
+
+
+class RealSixChannelStep(nn.Module):
+    """Six real channels, matching complex state's 6 scalar components.
+
+    The same real drive/transform projections are used for every channel,
+    matching the shared-weight parameterization of PersistentStep.
+    A real 6x6 orthogonal mixer is a stronger, unconstrained control than
+    the structured real representation of a complex 3x3 unitary.
+    """
+
+    def __init__(self, width: int, rank: int, *, mixing: bool = True) -> None:
+        super().__init__()
+        self.drive = nn.Linear(width, rank, bias=False)
+        self.transform = nn.Linear(rank, rank, bias=False)
+        self.gains = nn.Parameter(
+            torch.tensor([-1.0, -0.6, 0.1, 0.3, 0.8, 1.2])
+        )
+        self.mix = RealOrthogonalMixer(enabled=mixing)
+        nn.init.normal_(self.drive.weight, mean=0.0, std=0.02)
+        nn.init.normal_(self.transform.weight, mean=0.0, std=0.02)
+
+    def forward(self, hidden: torch.Tensor,
+                state: torch.Tensor | None) -> torch.Tensor:
+        drive = self.drive(hidden.float())
+        injected = drive.unsqueeze(2) * self.gains.view(1, 1, 6, 1) / math.sqrt(6)
+        if state is None:
+            state = injected
+        else:
+            state = 0.8 * state + 0.2 * injected
+        # Real-valued componentwise SiLU matches the complex branch's
+        # separate real/imag activation and provides comparable nonlinearities.
+        transformed = self.transform(state)
+        state = state + 0.2 * F.silu(transformed)
+        return self.mix(state)
+
+
 class PersistentStateAdapterLM(nn.Module):
     """Frozen pretrained LM plus a separate depth-persistent sidecar.
 
@@ -69,8 +130,8 @@ class PersistentStateAdapterLM(nn.Module):
     def __init__(self, backbone: nn.Module, *, rank: int = 16,
                  mode: PersistentMode = "mixed", residual_scale: float = 0.1) -> None:
         super().__init__()
-        if mode not in ("mixed", "no_mixing"):
-            raise ValueError("mode must be 'mixed' or 'no_mixing'")
+        if mode not in ("mixed", "no_mixing", "real_six", "real_six_no_mixing"):
+            raise ValueError("Unsupported persistent sidecar mode")
         if rank < 1 or not 0 < residual_scale <= 1 or not math.isfinite(residual_scale):
             raise ValueError("Invalid rank/residual scale")
         cfg = getattr(backbone, "config", None)
@@ -91,7 +152,9 @@ class PersistentStateAdapterLM(nn.Module):
         self.residual_scale = residual_scale
         device = output.weight.device
         self.steps = nn.ModuleList([
-            PersistentStep(width, rank, mode).to(device=device)
+            (RealSixChannelStep(width, rank, mixing=(mode == "real_six"))
+             if mode.startswith("real_six") else PersistentStep(width, rank, mode))
+            .to(device=device)
             for _ in range(len(layers))
         ])
         self.readout = nn.Linear(rank, width, bias=False).to(device=device)
@@ -118,7 +181,8 @@ class PersistentStateAdapterLM(nn.Module):
         for step, layer_hidden in zip(self.steps, hidden[1:]):
             state = step(layer_hidden, state)
         assert state is not None
-        merged = state.sum(dim=2).real / math.sqrt(3)
+        merged = (state.sum(dim=2).real / math.sqrt(3)
+                  if state.is_complex() else state.sum(dim=2) / math.sqrt(6))
         projected = self.readout(merged) * self.residual_scale
         head = self.backbone.get_output_embeddings()
         correction = F.linear(projected.to(head.weight.dtype), head.weight)

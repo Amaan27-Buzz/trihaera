@@ -143,6 +143,30 @@ python scripts/smoke_persistent.py --device cuda --mode no_mixing --output artif
 
 The smoke verifies exact original-logit parity, gradient flow, training time and GPU memory. It does **not** measure held-out language quality. Read [Persistent-state research](docs/PERSISTENT_STATE.md) and [current checkpoint](docs/PROJECT_STATE.md).
 
+## Verified persistent sidecar CUDA integration (2026-10-30)
+
+The owner's RTX 5060 passed **53 tests**. On the real SmolLM2-135M backbone, both depth-persistent modes retained **exact original logits at initialization** and trained for two steps without nonfinite gradients.
+
+| Mode | Trainable params | Two-step time | Logit RMS drift | Peak allocated CUDA |
+| --- | ---: | ---: | ---: | ---: |
+| Mixed complex sidecar | 294,096 | 0.723 s | 0.10638 | 350,269,440 B |
+| Same sidecar, no mixing | 293,556 | 0.441 s | 0.11238 | 350,023,680 B |
+
+The mixer was **~64% slower** in this short smoke, with no usable quality comparison. Neither last training loss nor logit drift should be ranked as language-model performance.
+
+**New stronger controls:** six real-valued channels at the same low-rank width, with either learned real orthogonal 6×6 mixing or no mixing. This matches the *number of real scalar state channels* used to represent three complex channels. Parameter counts are close, not identical; report time/FLOPs separately.
+
+**Next GPU experiment** (uses cached SmolLM2 weights and WikiText-2):
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/replicate_persistent.py --device cuda --seeds 17,23,42 --steps 100 --eval-windows 64 --output artifacts/persistent_replication_135m.json
+```
+
+This trains all four persistent variants on matched token exposures. It is an **early structural comparison**, not a compute-matched architecture win. See [persistent-state research](docs/PERSISTENT_STATE.md).
+
 ## Evaluation standard
 
 Measure trainable parameters, FLOPs, training tokens, validation loss, inference latency, throughput and VRAM separately. Include dense, recurrent/shared-weight and interference-disabled baselines; predeclare meaningful thresholds and avoid cherry-picking. A negative research outcome is valid. **Do not claim quantum speedups or model-quality gains without evidence.**

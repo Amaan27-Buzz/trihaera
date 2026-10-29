@@ -163,3 +163,87 @@ def test_causal_prefix_consistency():
         a = wrapped(input_ids=tokens).logits[:, :5]
         b = wrapped(input_ids=changed).logits[:, :5]
     torch.testing.assert_close(a, b, atol=0, rtol=0)
+
+
+@pytest.mark.parametrize("mode", ["real_six", "real_six_no_mixing"])
+def test_real_six_channel_control_preserves_base_at_initialization(mode):
+    torch.manual_seed(141)
+    backbone = TinyLM(width=12, depth=3)
+    tokens = torch.randint(0, 31, (2, 7))
+    reference = backbone(input_ids=tokens).logits.clone()
+    adapted = PersistentStateAdapterLM(backbone, rank=5, mode=mode)
+    prediction = adapted(input_ids=tokens, labels=tokens)
+    torch.testing.assert_close(prediction.logits, reference, atol=0, rtol=0)
+    assert torch.isfinite(prediction.loss)
+    assert all(not p.requires_grad for p in backbone.parameters())
+    if mode == "real_six_no_mixing":
+        assert all(
+            not p.requires_grad for step in adapted.steps
+            for p in step.mix.parameters()
+        )
+
+
+def test_real_orthogonal_mixer_preserves_norm_and_has_six_channels():
+    from trihaera.persistent import RealOrthogonalMixer
+    torch.manual_seed(144)
+    mixer = RealOrthogonalMixer()
+    with torch.no_grad():
+        mixer.skew.add_(0.1 * torch.randn(6, 6))
+        matrix = mixer.matrix()
+        torch.testing.assert_close(
+            matrix.T @ matrix, torch.eye(6), atol=1e-5, rtol=1e-5
+        )
+        states = torch.randn(2, 5, 6, 8)
+        mixed = mixer(states)
+        torch.testing.assert_close(
+            states.square().sum(dim=2),
+            mixed.square().sum(dim=2), atol=1e-5, rtol=1e-5,
+        )
+
+
+@pytest.mark.parametrize("mode", ["real_six", "real_six_no_mixing"])
+def test_real_six_control_trains_and_modifies_outputs(mode):
+    torch.manual_seed(146)
+    model = PersistentStateAdapterLM(TinyLM(), rank=5, mode=mode)
+    tokens = torch.randint(0, 31, (2, 6))
+    original = model(input_ids=tokens).logits.detach().clone()
+    optimizer = torch.optim.AdamW(list(persistent_parameters(model)), lr=0.01)
+    for _ in range(3):
+        optimizer.zero_grad(set_to_none=True)
+        loss = model(input_ids=tokens, labels=tokens).loss
+        loss.backward()
+        optimizer.step()
+    assert not torch.allclose(original, model(input_ids=tokens).logits)
+    assert all(torch.isfinite(p).all() for p in persistent_parameters(model))
+
+
+def test_real_six_mixer_can_receive_gradient():
+    torch.manual_seed(151)
+    model = PersistentStateAdapterLM(TinyLM(depth=3), rank=5, mode="real_six")
+    tokens = torch.randint(0, 31, (2, 7))
+    optimizer = torch.optim.AdamW(list(persistent_parameters(model)), lr=0.01)
+    for _ in range(2):
+        optimizer.zero_grad(set_to_none=True)
+        model(input_ids=tokens, labels=tokens).loss.backward()
+        optimizer.step()
+    optimizer.zero_grad(set_to_none=True)
+    model(input_ids=tokens, labels=tokens).loss.backward()
+    gradients = model.steps[0].mix.skew.grad
+    assert gradients is not None and torch.isfinite(gradients).all()
+    assert gradients.abs().sum() > 0
+
+
+def test_real_six_prefix_causal():
+    torch.manual_seed(153)
+    model = PersistentStateAdapterLM(
+        TinyLM(depth=3), rank=5, mode="real_six"
+    )
+    with torch.no_grad():
+        model.readout.weight.normal_(0, 0.1)
+    tokens = torch.randint(0, 31, (1, 8))
+    other = tokens.clone()
+    other[:, 5:] = (other[:, 5:] + 3) % 31
+    with torch.no_grad():
+        a = model(input_ids=tokens).logits[:, :5]
+        b = model(input_ids=other).logits[:, :5]
+    torch.testing.assert_close(a, b, atol=0, rtol=0)

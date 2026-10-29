@@ -71,3 +71,27 @@ python scripts/smoke_persistent.py --device cuda --mode no_mixing --output artif
 **Inspect:** both modes must preserve initial logits exactly; both must train without nonfinite gradients or excessive VRAM. Compare trainable parameters, elapsed time and output drift. Do **not** compare 2-step losses as a quality benchmark. After real-model CUDA integration passes, implement a proper three-seed, identical-token held-out comparison against a real-valued recurrent sidecar and no-mixing control before attempting larger models.
 
 **Decision gate:** Stage 1 remains open; if depth-persistent interference fails to outperform comparators at acceptable measured compute, revise or reject the hypothesis rather than automatically scaling.
+
+## Owner's RTX 5060 persistent-sidecar smoke: 2026-10-30
+
+PyTorch 2.14.0+cu130, Transformers 5.18.0, 53 unit tests passed. On cached SmolLM2-135M weights, both persistent variants preserved base logits exactly and completed two optimizer steps:
+
+| Mode | Trainable parameters | Last train loss | Logit RMS drift | Two-step seconds | Peak allocated bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `mixed` | 294096 | 4.435823 | 0.106377 | 0.723428 | 350269440 |
+| `no_mixing` | 293556 | 4.436238 | 0.112375 | 0.441396 | 350023680 |
+
+This shows correct integration and ~64% two-step runtime overhead for mixing. It is **not** a validation loss comparison. Initial state readout was zero; early gradients take time to reach internal state-mixing parameters.
+
+### Next: six-real-channel controls and held-out replication
+
+The new `real_six` and `real_six_no_mixing` variants maintain 6 real channels at rank 16 across all 30 decoder depths. They match the raw real scalar channel width of `3 × complex64` states. All use shared low-rank projections and nonlinear processing between depth steps; the optional real 6×6 orthogonal mixer has more independent mixing directions than constrained complex 3×3 unitary mixing. This is a deliberately strong real-valued comparator, not an exact FLOP match.
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/replicate_persistent.py --device cuda --seeds 17,23,42 --steps 100 --eval-windows 64 --output artifacts/persistent_replication_135m.json
+```
+
+All variants train on the same token order and use the same WikiText-2 train/validation split; adapter capacities and compute are reported but not exactly matched. This remains a 135M **pretrained-derived** sidecar study, not full TRIHAERA pretraining.
