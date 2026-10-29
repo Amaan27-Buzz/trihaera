@@ -53,9 +53,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_windows.ps1
 
 This creates `trihaera\.venv` using Levis's installed packages, without modifying Levis. For troubleshooting and manual steps, see the Windows environment setup document.
 
-With that local environment activated:
+Activate TRIHAERA's independent environment and run the checks:
 
 ```powershell
+.\.venv\Scripts\Activate.ps1
 $env:PYTHONPATH = (Join-Path (Get-Location) 'src')
 python -m pytest -q
 python scripts/smoke.py --device cuda
