@@ -41,8 +41,6 @@ class LRA:
             "assistant_message_id": assistant_id,
             "retrieved_message_ids": list(plan.retrieved_ids),
             "active_memory_keys": list(plan.memory_keys),
-            "context_recent_message_ids": list(plan.recent_ids),
-            "active_memory_source_ids": list(plan.memory_source_ids),
             "input_context_tokens": plan.input_tokens,
             "context_compacted": plan.truncated,
             "generation_seconds": generated.latency_seconds,

@@ -102,3 +102,23 @@ The six-question quick path is `--quick`; use the default 12 scored probes
 for the complete diagnostic. Both generate additional setup replies through
 the real SmolLM model. Benchmark data is **strictly separate from the one
 personal LRA conversation**, and stored report content is synthetic.
+
+## 2026-10-30 prompt-contamination failure and correction
+
+Owner measured 0/10 automatic recall correctness despite full retrieval
+coverage. All 12 full-pilot answers echoed the same phrase that the benchmark
+itself had inserted as 100 fictional assistant replies. Normal chat also
+failed to obey a one-word request, so the issue is not solely benchmark
+contamination.
+
+Do not claim that improving retrieval will improve generation by itself.
+Maintain independent checks for:
+- Bare local model one-word instruction following.
+- Short prompt with explicit system instruction.
+- A fact supplied in ordinary chronological dialogue.
+- Duplicate assistant response contamination.
+- The LRA memory/context pipeline with distant facts.
+
+New prompt selection deduplicates exact assistant boilerplate and
+repeated retrieval evidence; canonical storage is unaffected. Synthetic filler
+now has diverse replies. Need actual GPU retest before interpreting impact.

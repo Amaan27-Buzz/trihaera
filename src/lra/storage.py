@@ -205,17 +205,28 @@ class History:
             for rank, (_, mid) in enumerate(scores[:max(40, limit*4)]):
                 ranks[mid] = ranks.get(mid, 0) + 1.0 / (60 + rank + 1)
 
-        # If no term matches, preserve a small recency fallback; never invent
-        # history. A profile/fact search remains separate from this evidence.
-        selected = sorted(ranks, key=lambda mid: (-ranks[mid], -mid))[:limit]
+        # Exact-duplicate historic turns must not occupy every evidence slot.
+        # This affects retrieval presentation ONLY, not saved original messages.
+        candidates = sorted(ranks, key=lambda mid: (-ranks[mid], -mid))
+        selected = []
+        fingerprints = set()
+        for mid in candidates:
+            row = self.get(mid)
+            fingerprint = " ".join(row["content"].casefold().split())
+            if fingerprint in fingerprints:
+                continue
+            fingerprints.add(fingerprint)
+            selected.append(row | {"retrieval_score": ranks[mid]})
+            if len(selected) >= limit:
+                break
         if not selected and terms:
             q = f"%{terms[0]}%"
             fallback = self.db.execute(
                 "SELECT id FROM messages WHERE lower(content) LIKE ? ORDER BY id DESC LIMIT ?",
                 (q, limit)).fetchall()
-            selected = [int(row["id"]) for row in fallback if row["id"] not in exclude_ids]
-        return [self.get(mid) | {"retrieval_score": ranks.get(mid, 0.0)}
-                for mid in selected]
+            selected = [self.get(int(row["id"])) | {"retrieval_score": 0.0}
+                        for row in fallback if row["id"] not in exclude_ids]
+        return selected
 
     def index_vectors(self, embedder, *, limit: int | None = None) -> int:
         if limit is not None and limit < 1:

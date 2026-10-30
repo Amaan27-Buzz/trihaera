@@ -170,6 +170,46 @@ A failure should be classified as: **source not retrieved**, **source in
 context but model ignored it**, **stale/corrected fact**, or **unclear
 answer**. Review actual model outputs before changing the architecture.
 
+## 2026-10-30: SmolLM response collapse — diagnostic checkpoint
+
+**Observed on user's RTX 5060:**
+- Normal chat handled greetings but refused the simple instruction `say under` three times, giving an irrelevant generic assistant statement.
+- Multi-prompt quick evaluation: **0/5** literal answer checks passed.
+- Full scripted evaluation: **0/10** literal answer checks passed.
+- Every expected source was available in the context builder (reported 100% source coverage); yet each response repeated `Noted. We can continue our ongoing conversation.`.
+- Cause is **not proven**. However, the old benchmark inserted that exact fake assistant reply 100 times in synthetic history, a strong generation-contamination confound. The prompt also described the companion as a local archive.
+
+**Changes:**
+1. Replace archive-centric prompt with concise companion-first instructions emphasizing the latest actual user turn.
+2. Deduplicate exact repeated assistant messages **only in the prompt view**, never in the stored canonical history. Likewise deduplicate exact repeated retrieved evidence.
+3. Replace the 100 identical benchmark acknowledgements with distinct synthetic conversation exchanges covering multiple mundane topics.
+4. Add a five-case diagnostic that distinguishes **bare-model instruction following**, simple system prompt, supplied-context recall, repeated-response stress, and LRA old-fact recall. Do not assume the changes succeeded until the actual GPU result is measured.
+5. Regression tests verify the user request remains the final turn, canonical messages are intact, and boilerplate does not occupy every evidence slot.
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+
+# First isolate model capability versus prompt/retrieval issues (5 generations).
+python scripts/diagnose_generation.py --device cuda --offline --output artifacts/lra_prompt_diagnostics.json
+
+# Then rerun the same six-case pilot with revised synthetic dialogue.
+python scripts/evaluate_companion.py --device cuda --offline --quick --output artifacts/lra_eval_quick_v2.json
+
+# Only after reviewing the quick answers, run the full 12-prompt suite.
+python scripts/evaluate_companion.py --device cuda --offline --output artifacts/lra_eval_full_v2.json
+```
+
+If the **bare** `say under` test fails, prompting and memory alone cannot
+explain the problem; inspect the model checkpoint, tokenizer/generation route,
+and compare a stronger local instruct model (e.g. SmolLM2-1.7B-Instruct)
+before implementing more memory complexity. If bare works but LRA fails,
+inspect the rendered context and retrieval placement.
+
+The revised benchmark is still synthetic; it has not been GPU-validated by
+the assistant. The user must supply actual outputs for model-quality claims.
+
 ## Engineering and research
 
 See [COMPANION_SPEC.md](docs/COMPANION_SPEC.md) for the product definition,

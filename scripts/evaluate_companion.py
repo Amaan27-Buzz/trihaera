@@ -55,6 +55,7 @@ def run_benchmark(db_path: Path, model, *, filler_pairs: int = 100,
         "max_input_tokens": max_input_tokens,
         "max_new_tokens": model.max_new_tokens,
         "synthetic_filler_pairs": filler_pairs,
+        "filler_generation": "varied synthetic exchanges (not model generated)",
         "scripted_probe_count": len(selection),
         "records": [],
         "memory_snapshots": [],
@@ -124,9 +125,39 @@ def run_benchmark(db_path: Path, model, *, filler_pairs: int = 100,
         app = new_app(history)
         for label, prompt in INTRO:
             ask_seed(app, label, prompt)
+        # Synthetic history must not teach the model to parrot one stock
+        # assistant phrase. Vary both speakers and include actual useful
+        # responses. These are clearly synthetic, NOT SmolLM generations.
+        themes = (
+            ("I walked past the park this afternoon.",
+             "The trees along the park path sound pleasant."),
+            ("My laptop fan was unusually loud today.",
+             "Check temperatures and vents before assuming a hardware fault."),
+            ("I tried making pasta for dinner.",
+             "You can save the cooking water to loosen the sauce."),
+            ("I read a chapter about astronomy.",
+             "Was the chapter about stars, planets, or galaxies?"),
+            ("I looked through some old photographs.",
+             "Would you like to talk about what they reminded you of?"),
+            ("The afternoon rain stopped our walk.",
+             "You could try again when the weather clears."),
+            ("I wrote a short shopping list.",
+             "Checking it before leaving might save another trip."),
+            ("I watched a documentary about oceans.",
+             "Deep-sea ecosystems can be surprisingly varied."),
+            ("My houseplants needed watering.",
+             "Check the soil before adding more water."),
+            ("I reorganized a small shelf.",
+             "Keeping frequently used things in reach should help."),
+            ("We discussed a bread recipe.",
+             "Proofing time depends on dough temperature."),
+            ("I repaired a loose drawer handle.",
+             "Retightening the screw after some use might help."),
+        )
         for i in range(filler_pairs):
-            history.append("user", f"Routine diary item {i:03d}: tea, traffic, and errands.")
-            history.append("assistant", "Noted. We can continue our ongoing conversation.")
+            user, reply = themes[i % len(themes)]
+            history.append("user", f"Diary entry {i:03d}: {user}")
+            history.append("assistant", f"Regarding entry {i:03d}: {reply}")
 
         for name in (
             "name_early", "style_old", "milestone_old",
