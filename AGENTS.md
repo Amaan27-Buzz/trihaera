@@ -1,11 +1,16 @@
-# TRIHAERA engineering instructions
+# LRA development instructions
 
-1. **Main only:** make changes directly on the existing `main` branch. Do not create branches or PRs unless the owner explicitly asks.
-2. Research integrity comes first: distinguish hypotheses, tests, and verified experimental results. Never claim a physical quantum computer, intrinsic 3× intelligence, longer memory, hallucination reduction, or novelty without evidence.
-3. Track the authoritative stage state in docs/PROJECT_STATE.md and gates in docs/ROADMAP.md. Update them whenever a substantive milestone is actually completed.
-4. Keep code modular in src/trihaera; require tests for attention causality, state mixing, gradients and optimization.
-5. Use fair baselines. Separate equal-parameter, equal-token and equal-compute comparisons. Record measured memory, latency and throughput.
-6. Treat the 500–700M foundation model as the post-validation target; its chat model is an instruction-tuned version of that same checkpoint.
-7. Local experiments must run in TRIHAERA's own .venv, not modify Levis's dependencies. Reuse the package files from Levis where practical, with relocation checks.
-8. Do not begin expensive pretraining without the Stage 3 evidence gate, a proper Stage 4 training protocol and owner-controlled compute budget.
-9. TRIHAERA is independent of LEVIS/PhaseMemory and PLURIMENS. Criticize questionable assumptions; do not act as a yes-man.
+- LRA is **one continuous AI companion**, not multi-chat software, not merely
+  an archival search utility. Prioritize natural conversation continuity.
+- Single chronological persistent conversation with clear canonical history.
+- Local-first, private-by-default; no remote inference and no telemetry.
+- Distinguish retrieved evidence from generated claims. No false memory.
+- Avoid silent context truncation and avoid modifying archived messages.
+- Preserve corrections and source provenance; implement deletion controls
+  before sensitive production use.
+- Keep the first baseline GPU-friendly: SmolLM2-360M-Instruct on 8GB VRAM.
+- CPU tests must pass without downloading model weights or installing Torch.
+- Add tests and measurable recall / quality checks with each change.
+- **Commit directly to main only**. Do not open branches or PRs.
+- Former TRIHAERA code remains accessible through Git history; do not
+  reintroduce the cancelled research direction without an explicit request.
