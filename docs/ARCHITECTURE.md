@@ -154,3 +154,9 @@ The algebra is exact. Forward and gradient equivalence (within floating-point to
 **Important nuance:** The complete stand-alone TRIHAERA decoder *does* apply its mixer between successive nonlinear Transformer blocks; this specific collapse proof does not apply to the entire decoder. Whether that decoder gains useful quality remains unproven.
 
 **Development consequence:** Do not promote the current pretrained 3×3 adapter as a fundamental superposition breakthrough. Continue the adaptation as a controlled engineering bridge and design a genuine persistent-state / cross-state nonlinear mechanism with appropriate real-valued baselines.
+
+## 9. 2026-10-30 real-equivalence result and next feedback hypothesis
+
+The prior persistent sidecar's U(3) learned state transition is exactly expressible in six real channels; owner 3-seed experiment reproduced output quality up to ~8e-6 mean NLL. A matched-initialization 6-real O(6) mixer achieved slightly better NLL (−0.000809), without a compute-matched comparison. Complex representation itself is **not evidence of a new computation class**. Runtime comparisons are noisy due to outlier runs.
+
+New `FeedbackCausalLM` tests whether the carried state influences later pretrained attention through a zero-initialized hidden-stream residual placed after every decoder block. This is architecturally more integrated than a detached sidecar but is still a pretrained-derived, frozen-weight experiment; a from-scratch TRIHAERA decoder remains a separate research objective. No state is carried across separate forward requests. The initial output must match pretrained logits exactly.

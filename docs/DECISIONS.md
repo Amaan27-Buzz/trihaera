@@ -40,3 +40,8 @@ Conclusions must be revisable based on results, including negative ones. No fabr
 | T-026 | Do not claim a persistent mixer win based on −0.001188 NLL | 3-seed mixed-vs-unmixed signal is tiny versus ~2.17× training time | Replicated gains under matched FLOPs and time |
 | T-027 | Replace initialization-confounded `real_six` as primary baseline with matched-initialization 6-real O(6) control | Old real_six uses different state injections, invalidating complex-vs-real causal inference | Well controlled new comparison |
 | T-028 | Add exact 6-real representation of complex U(3) and gradients | Verifies classical equivalence; no physical quantum advantage is claimed | Any forward/gradient disagreement indicates implementation error |
+
+| T-029 | Treat exact complex and real-equivalent models as mathematically identical | Three seeds differ in mean validation NLL by only 0.0000078; complex values are classically representable | Substantive difference at equal weights/precision indicates bug |
+| T-030 | No claimed U(3) advantage over matched-start O(6) | O(6) has slightly better NLL on all three seeds, −0.000809 mean; 540 extra weights and small sample | New matched-compute, multi-data controls |
+| T-031 | Prioritize integrated hidden-stream feedback over more detached-sidecar sweeps | Existing sidecar cannot modify pretrained attention; mixer win tiny and not efficiency-proven | Correctness or 8GB memory gate fails |
+| T-032 | Treat current wall-clock comparisons as untrustworthy for kernel ranking | Run times varied dramatically for same mode/steps; likely system variability but no diagnosed cause | Synchronized repeated warm measurements and measured FLOPs |

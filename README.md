@@ -193,6 +193,24 @@ python scripts/replicate_persistent.py --device cuda --modes mixed,no_mixing,rea
 
 Differences between `mixed` and `real_equivalent` should be only floating-point numerical noise; persistent differences signal a bug. The O(6) comparator starts from the same complex-equivalent state but can learn a wider range of rotations. **Neither 100-step token matching nor apparent faster math is a claim of compute-matched quality.**
 
+## Matched-real findings and first feedback implementation (October 30, 2026)
+
+The matched real-valued comparison did **not establish a unique benefit** from complex-phase U(3) mixing: exact-real re-encoding performed identically (within numerical noise), while a matched-initialization O(6) real mixer achieved a slightly lower NLL on all three seeds. The differences are small, the controls differ in effective parameters, and runtime measurements were unusually variable.
+
+**Next step is not another sidecar sweep.** `src/trihaera/feedback.py` carries trainable state across pretrained decoder depths **and feeds zero-initialized corrections into the next frozen decoder block**, so downstream attention sees state-modified hidden activations after training begins. This first integrated bridge is still pretrained-derived and is not full from-scratch TRIHAERA.
+
+First hardware gate (already downloaded SmolLM2 model):
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/smoke_feedback.py --device cuda --mode mixed --output artifacts/feedback_mixed_smoke.json
+python scripts/smoke_feedback.py --device cuda --mode real_matched_orthogonal --output artifacts/feedback_real_matched_smoke.json
+```
+
+This test checks **exact initial pretrained parity**, training gradients through frozen decoder blocks, peak VRAM, and absence of state leakage. It is **not a quality test**. Read [latest research analysis](docs/FEEDBACK_RESEARCH.md).
+
 ## Evaluation standard
 
 Measure trainable parameters, FLOPs, training tokens, validation loss, inference latency, throughput and VRAM separately. Include dense, recurrent/shared-weight and interference-disabled baselines; predeclare meaningful thresholds and avoid cherry-picking. A negative research outcome is valid. **Do not claim quantum speedups or model-quality gains without evidence.**

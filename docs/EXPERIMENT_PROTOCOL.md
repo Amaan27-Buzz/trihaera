@@ -76,3 +76,11 @@ New controls:
 - Include `mixed` and `no_mixing` for continuity with prior runs.
 
 Use identical train and validation packed tokens, 100 steps, seeds 17/23/42 and document per-mode trainable parameters and time. The experiment remains **not FLOP-matched**, even though raw real state width is now comparable. A claim of increased capability requires multi-dataset testing, stronger transformer/recurrent baselines, and matched training compute.
+
+## Feedback integration gate — October 30, 2026
+
+The next experiment is an **engineering compatibility** gate, not a performance or language-quality ranking. New `FeedbackCausalLM` wraps frozen pretrained decoder layers, preserves a depth-persistent state, and injects a zero-initialized projected correction to each layer output so later pretrained self-attention receives modified hidden states. The backward pass **must** travel through frozen original blocks; expect higher activation memory than detached sidecars.
+
+Compare a complex U(3) and an initialization-matched real O(6) feedback mode, with no-mixing retained in source. Require exact initial logit parity, causal prefix, no original-weight updates, nonzero feedback gradients, bounded memory on 8GB RTX 5060, and no state leakage across calls/errors. Do not infer architecture quality from two optimizer steps.
+
+If compatibility passes: measure held-out NLL and time/VRAM with synchronized warm repetitions, param/compute accounting, and a stronger real-valued shared-weight control *before* deciding whether to train at wider scale.
