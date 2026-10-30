@@ -66,6 +66,8 @@ def run_benchmark(db_path: Path, model, *, filler_pairs: int = 100,
             "All prompts, persona details and distractors are synthetic.",
             "The benchmark does not train/fine-tune SmolLM.",
             "Source hits, answer string checks and human review are distinct.",
+            "Guarded outputs and raw SmolLM generations are both recorded; "
+            "grounding overrides must not be counted as raw model improvement.",
             "It is a controlled smoke test, not evidence of lifelong companion quality.",
             "The benchmark database is separate from the user's actual one-chat archive.",
         ],
@@ -101,10 +103,18 @@ def run_benchmark(db_path: Path, model, *, filler_pairs: int = 100,
             "category": case.category,
             "question": case.prompt,
             "answer": outcome["answer"],
+            "raw_model_answer": outcome.get("raw_answer", outcome["answer"]),
+            "grounding_override": outcome.get("grounding_override", False),
+            "grounding_reason": outcome.get("grounding_reason"),
             "evaluation": score_answer(outcome["answer"], case),
+            "raw_model_evaluation": score_answer(
+                outcome.get("raw_answer", outcome["answer"]), case),
             "source_message_ids": original_ids,
             "evidence_source_ids": source_ids,
-            "sources_available": all(mid in source_ids for mid in original_ids),
+            "sources_available": (
+                all(mid in source_ids for mid in original_ids)
+                if original_ids else None
+            ),
             "retrieved_message_ids": outcome["retrieved_message_ids"],
             "active_memory_keys": outcome["active_memory_keys"],
             "context_tokens": outcome["input_context_tokens"],
@@ -196,6 +206,13 @@ def run_benchmark(db_path: Path, model, *, filler_pairs: int = 100,
         report["final_memory_count"] = len(history.memories())
         report["source_message_ids"] = origins
         report["summary"] = summarize(report["records"])
+        report["summary"]["grounding_overrides"] = sum(
+            bool(row["grounding_override"]) for row in report["records"]
+        )
+        report["summary"]["raw_model_literal_passes"] = sum(
+            row["raw_model_evaluation"]["verdict"] == "pass"
+            for row in report["records"]
+        )
 
     report["total_seconds"] = time.perf_counter() - started
     return report

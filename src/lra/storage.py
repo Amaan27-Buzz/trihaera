@@ -161,7 +161,8 @@ class History:
         return int(self.db.execute("SELECT count(*) FROM messages").fetchone()[0])
 
     def search(self, query: str, *, limit: int = 8,
-               exclude_ids: set[int] | None = None, embedder=None) -> list[dict]:
+               exclude_ids: set[int] | None = None, embedder=None,
+               role: str | None = None) -> list[dict]:
         """Lexical FTS plus optional persisted semantic vectors, ranked via RRF.
 
         Every returned item has exact canonical message id and original text.
@@ -169,6 +170,8 @@ class History:
         """
         if limit < 1:
             raise ValueError("limit must be >=1")
+        if role is not None and role not in ("user", "assistant", "system"):
+            raise ValueError("Unsupported message role filter")
         exclude_ids = exclude_ids or set()
         terms = list(dict.fromkeys(_words(query)))[:12]
         lexical = []
@@ -179,8 +182,9 @@ class History:
                     """SELECT m.*, bm25(message_fts) AS bm FROM message_fts
                        JOIN messages m ON m.id=message_fts.rowid
                        WHERE message_fts MATCH ?
+                         AND (? IS NULL OR m.role = ?)
                        ORDER BY bm ASC LIMIT ?""",
-                    (safe, max(40, limit*4))).fetchall()
+                    (safe, role, role, max(40, limit*4))).fetchall()
             except sqlite3.OperationalError:
                 lexical = []
         ranks = {}
@@ -197,7 +201,7 @@ class History:
                 "SELECT message_id,embedding_json FROM vectors WHERE model_id=?",
                 (embedder.model_id,)):
                 mid = int(row["message_id"])
-                if mid in exclude_ids:
+                if mid in exclude_ids or (role is not None and self.get(mid)["role"] != role):
                     continue
                 similarity = _cosine(query_embedding, json.loads(row["embedding_json"]))
                 scores.append((similarity, mid))
@@ -222,8 +226,9 @@ class History:
         if not selected and terms:
             q = f"%{terms[0]}%"
             fallback = self.db.execute(
-                "SELECT id FROM messages WHERE lower(content) LIKE ? ORDER BY id DESC LIMIT ?",
-                (q, limit)).fetchall()
+                "SELECT id FROM messages WHERE lower(content) LIKE ? "
+                "AND (? IS NULL OR role = ?) ORDER BY id DESC LIMIT ?",
+                (q, role, role, limit)).fetchall()
             selected = [self.get(int(row["id"])) | {"retrieval_score": 0.0}
                         for row in fallback if row["id"] not in exclude_ids]
         return selected

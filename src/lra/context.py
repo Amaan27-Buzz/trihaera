@@ -4,8 +4,35 @@ Compaction here means selecting evidence for each model call: not deleting,
 rewriting, or pretending that all historical tokens fit in the model's KV cache.
 """
 from dataclasses import dataclass
+import re
 
 from .storage import History
+
+# These are conservative routing hints, not a replacement for semantic recall.
+_RECALL = re.compile(
+    r"\b(?:remember|earlier|previously|before|introduced|reopen(?:ing|ed)?|"
+    r"what\s+(?:name|did|was|were|is|reply)|which\s+name|"
+    r"we\s+were|first\s+public|private\s+work)\b", re.I,
+)
+_ASSISTANT_REFERENCE = re.compile(
+    r"\b(?:you\s+(?:said|told|suggested|recommended)|your\s+(?:answer|reply|suggestion))\b",
+    re.I,
+)
+_STOP = frozenset((
+    "the", "this", "that", "was", "were", "what", "when", "which",
+    "name", "tell", "told", "please", "have", "been", "with",
+    "from", "then", "before", "after", "about", "should", "could",
+    "would", "your", "mine", "ours", "have", "there", "thing", "something",
+    "did", "you", "for", "our", "are", "and", "now", "earlier",
+))
+
+
+def _focus_terms(value: str) -> set[str]:
+    return {
+        w for w in re.findall(r"[^\W_]+", value.casefold(), re.UNICODE)
+        if len(w) > 2 and w not in _STOP
+    }
+
 
 
 BASE_SYSTEM = (
@@ -17,6 +44,8 @@ BASE_SYSTEM = (
     "If asked who you are, explain that you are LRA powered by a local "
     "small language model; do not invent who personally created you. "
     "Older chat excerpts are background evidence, NOT requests to answer now. "
+    "Your own earlier assistant replies are not evidence that the user "
+    "provided a personal fact. Do not copy unrelated nearby topic details. "
     "Use explicitly sourced memories to recall the user's past statements. "
     "When records conflict, a newer explicit correction supersedes older ones. "
     "Never invent past conversations, private details or missing dates; "
@@ -62,9 +91,23 @@ def build_context(history: History, query: str, *, token_count,
             seen_assistant.add(fingerprint)
         recent_filtered.append(item)
     recent = list(reversed(recent_filtered))
+    # Recall-specific questions shouldn't copy unrelated nearby answers as
+    # evidence. In ordinary conversation keep the full recent dialogue.
+    # Retrieval from original user messages remains available for distant facts.
+    recall_mode = bool(_RECALL.search(query))
+    assistant_recall = bool(_ASSISTANT_REFERENCE.search(query))
+    if recall_mode and not assistant_recall:
+        focus = _focus_terms(query)
+        if focus:
+            recent = [
+                row for row in recent if row["role"] == "user"
+                and bool(_focus_terms(row["content"]) & focus)
+            ]
     recent_ids = {r["id"] for r in recent} | {newest["id"]}
-    evidence = history.search(query, limit=recall, exclude_ids=recent_ids,
-                              embedder=embedder) if recall else []
+    evidence = history.search(
+        query, limit=recall, exclude_ids=recent_ids, embedder=embedder,
+        role=None if assistant_recall else "user",
+    ) if recall else []
     mems = history.memories(limit=30)
 
     def encode(memories, retrieved, context):

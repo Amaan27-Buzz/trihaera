@@ -122,3 +122,18 @@ Maintain independent checks for:
 New prompt selection deduplicates exact assistant boilerplate and
 repeated retrieval evidence; canonical storage is unaffected. Synthetic filler
 now has diverse replies. Need actual GPU retest before interpreting impact.
+
+## October 30: limitation of the initial benchmark
+
+Measured (not conjectured): 8/10 revised literal recall successes and
+10/10 expected source presence. Generated answers still copied a synthetic
+"Regarding entry 099" preamble; later follow-up questions mixed unrelated
+project facts, and the small model invented private phone/date information.
+
+Companion safety/quality now requires both exact *user* source attribution
+and raw-versus-served-generation auditing. A simple source absence guard
+on some personal exact values must **never** be counted as SmolLM learning
+the correct behavior. The ongoing experience remains one chat; benchmark
+databases are independent synthetic fixtures, not new product chat threads.
+
+See [EVALUATION_FINDINGS.md](EVALUATION_FINDINGS.md).

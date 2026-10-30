@@ -210,6 +210,31 @@ inspect the rendered context and retrieval placement.
 The revised benchmark is still synthetic; it has not been GPU-validated by
 the assistant. The user must supply actual outputs for model-quality claims.
 
+## Latest owner GPU results and grounding work (2026-10-30)
+
+The revised scripted companion benchmark improved from 0/10 to **8/10
+literal recall checks** with 10/10 source presence; this did **not** mean
+the companion was accurate. Two follow-ups used the wrong project reference
+and the model hallucinated a private phone number and an exact presentation
+date that were never supplied. It also copied the synthetic prefix
+`Regarding entry 099` into every answer.
+
+A new diagnostic checkpoint isolates source authority, topical continuity
+and exact unsupported personal details. The model's **raw** output remains
+visible for evaluation; a bounded personal-fact safeguard may replace an
+unsupported literal identifier with an uncertainty response in the served
+conversation. This is a narrow safeguard, not broad factuality verification.
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/evaluate_companion.py --device cuda --offline --quick --output artifacts/lra_eval_quick_v3.json
+python scripts/evaluate_companion.py --device cuda --offline --output artifacts/lra_eval_full_v3.json
+```
+
+See [the measured results and limitations](docs/EVALUATION_FINDINGS.md).
+
 ## Engineering and research
 
 See [COMPANION_SPEC.md](docs/COMPANION_SPEC.md) for the product definition,

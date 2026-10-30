@@ -1,6 +1,7 @@
 """LRA: one chronological chat, bounded working context, durable history."""
 from .context import build_context
 from .memory import extract_explicit_facts
+from .grounding import review_personal_claim
 
 
 class LRA:
@@ -30,13 +31,27 @@ class LRA:
             embedder=self.embedder
         )
         generated = self.model.generate(plan.messages)
+        # Only the original USER's statements can corroborate a personal
+        # identifier or event date. Our own past generated answers cannot.
+        source_ids = set(plan.retrieved_ids + plan.recent_ids +
+                         plan.memory_source_ids)
+        sources = [
+            self.history.get(mid) for mid in sorted(source_ids)
+        ]
+        user_evidence = [
+            item["content"] for item in sources if item and item["role"] == "user"
+        ]
+        reviewed = review_personal_claim(user_text, generated.text, user_evidence)
         assistant_id = None
-        if generated.text:
+        if reviewed["answer"]:
             assistant_id = self.history.append(
-                "assistant", generated.text, embedder=self.embedder
+                "assistant", reviewed["answer"], embedder=self.embedder
             )
         return {
-            "answer": generated.text,
+            "answer": reviewed["answer"],
+            "raw_answer": reviewed["raw_answer"],
+            "grounding_override": reviewed["grounding_override"],
+            "grounding_reason": reviewed["grounding_reason"],
             "user_message_id": source_id,
             "assistant_message_id": assistant_id,
             "retrieved_message_ids": list(plan.retrieved_ids),
