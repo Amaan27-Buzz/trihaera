@@ -36,3 +36,7 @@ Conclusions must be revisable based on results, including negative ones. No fabr
 | T-023 | Accept CUDA correctness of 30-depth persistent sidecar but not claim quality | Mixed and unmixed were exactly baseline-preserving; ~64% slower two-step mix with no held-out comparison | Rigorous held-out / throughput results |
 | T-024 | Add six-real-channel depth-recurrent controls, including an unconstrained real orthogonal mixer | Controls for 3 complex channels having 6 real scalar components and stronger mixing; classical simulation provides no free quantum advantage | Measured compute/parameter matching and better real baselines |
 | T-025 | Replicate persistent sidecar and real controls using identical token exposures and 3 seeds | Prior local mixer advantage noisy and training time 65% greater; new mechanism avoids immediate readout collapse | Statistically powered and FLOP-matched follow-up |
+
+| T-026 | Do not claim a persistent mixer win based on −0.001188 NLL | 3-seed mixed-vs-unmixed signal is tiny versus ~2.17× training time | Replicated gains under matched FLOPs and time |
+| T-027 | Replace initialization-confounded `real_six` as primary baseline with matched-initialization 6-real O(6) control | Old real_six uses different state injections, invalidating complex-vs-real causal inference | Well controlled new comparison |
+| T-028 | Add exact 6-real representation of complex U(3) and gradients | Verifies classical equivalence; no physical quantum advantage is claimed | Any forward/gradient disagreement indicates implementation error |

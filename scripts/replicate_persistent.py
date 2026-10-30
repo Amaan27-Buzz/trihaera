@@ -26,14 +26,18 @@ from replicate_pretrained import git_sha, parse_csv
 MODEL_ID = "HuggingFaceTB/SmolLM2-135M"
 DATASET_ID = "Salesforce/wikitext"
 DATASET_CONFIG = "wikitext-2-raw-v1"
-MODES = ("mixed", "no_mixing", "real_six", "real_six_no_mixing")
+MODES = (
+    "mixed", "no_mixing", "real_equivalent",
+    "real_matched_orthogonal", "real_matched_orthogonal_no_mixing",
+    "real_equivalent_no_mixing", "real_six", "real_six_no_mixing",
+)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--seeds", default="17,23,42")
-    parser.add_argument("--modes", default=",".join(MODES))
+    parser.add_argument("--modes", default="mixed,no_mixing,real_equivalent,real_matched_orthogonal")
     parser.add_argument("--steps", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--sequence-length", type=int, default=128)
@@ -86,7 +90,7 @@ def main() -> None:
     print("Loading WikiText-2 official train and validation splits...", flush=True)
     train_data = load_dataset(DATASET_ID, DATASET_CONFIG, split="train")
     validation_data = load_dataset(DATASET_ID, DATASET_CONFIG, split="validation")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=False)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=False, local_files_only=True)
     train_windows, train_info = pack_text_windows(
         train_data, tokenizer, sequence_length=args.sequence_length,
         max_windows=args.train_windows, max_rows=args.train_rows,
@@ -142,6 +146,8 @@ def main() -> None:
         "limitations": [
             "Frozen SmolLM2, no adapter feedback into pretrained attention.",
             "Pretrained model may have previously seen WikiText-2 content.",
+        "real_equivalent exactly re-encodes three complex states using six real channels.",
+        "real_matched_orthogonal matches initialization but has more O(6) mixer degrees of freedom.",
             "Equal tokens and parameters do not guarantee equal compute.",
             "Real-six orthogonal mixer has more unconstrained effective mixing degrees of freedom.",
             "Three seeds and a short pilot do not establish statistical significance.",

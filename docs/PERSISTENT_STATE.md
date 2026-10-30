@@ -95,3 +95,36 @@ python scripts/replicate_persistent.py --device cuda --seeds 17,23,42 --steps 10
 ```
 
 All variants train on the same token order and use the same WikiText-2 train/validation split; adapter capacities and compute are reported but not exactly matched. This remains a 135M **pretrained-derived** sidecar study, not full TRIHAERA pretraining.
+
+## 2026-10-30: full owner three-seed persistent-sidecar report
+
+**Hardware:** RTX 5060 8GB; 60 tests passed; 100 steps per seed/mode, WikiText-2, official train/validation. **Frozen pretrained backbone NLL:** 3.705553.
+
+| Mode | Mean held-out NLL | NLL SD | Mean train time |
+| --- | ---: | ---: | ---: |
+| mixed | **3.538331** | 0.009588 | 26.2015s |
+| no_mixing | 3.539520 | 0.009063 | 12.0664s |
+| real_six | 3.565990 | 0.006624 | 19.9907s |
+| real_six_no_mixing | 3.598689 | 0.002931 | 7.5680s |
+
+Paired `mixed - no_mixing` NLL by seed 17,23,42 = **−0.002011, −0.000925, −0.000629**; mean −0.001188; SD 0.000728. Mixed training took **2.17×** as long as no-mixing. This is insufficient benefit to justify expensive scaling.
+
+**Important baseline flaw:** old `real_six` uses 6 real channels but *different learned gains and injection initialization* from the complex model. Its worse performance does not establish the value of complex computation.
+
+### New matched controls
+
+- `real_equivalent`: identical `drive`, `transform`, `phases`, `gains`, same separate SiLU, identical three-state readout, and an exactly real-encoded U(3) unitary mixer. For Hermitian `G=A+iB`, `U=exp(iG)` maps to a 6×6 orthogonal real matrix `exp([[-B,-A],[A,-B]])`. At identical weights, **forward and gradients match within floating-point error**. This exposes the fact that TRIHAERA is purely classical math, and tests alternative implementation speed.
+- `real_equivalent_no_mixing`: exact real version of the unmixed complex branch.
+- `real_matched_orthogonal`: identical six-real state injection and nonlinearities, but a freely learned real O(6) mixer initialized **to the complex U(3) transform**. Its O(6) matrix can learn transformations outside the U(3) subset. A stronger real-valued comparator.
+- `real_matched_orthogonal_no_mixing`: identical injection without a mixer.
+
+These controls have comparable but not all identical trainable parameter counts; track counts, GPU memory, time and losses, and ultimately compare equal-FLOP and equal-time budgets. Prefer the new matched control rather than the older real_six initialization-different variant.
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/replicate_persistent.py --device cuda --modes mixed,no_mixing,real_equivalent,real_matched_orthogonal --seeds 17,23,42 --steps 100 --eval-windows 64 --output artifacts/real_matched_replication_135m.json
+```
+
+**Falsifiable requirement:** if O(6), plain complex no-mixing, or an appropriately compute-matched real equivalent does as well or better, TRIHAERA's specific interference parameterization is not yet demonstrated as useful. This remains Stage 1 research, not a trained independent 500–700M foundation model.

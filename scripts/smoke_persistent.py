@@ -22,7 +22,7 @@ MODEL_ID = "HuggingFaceTB/SmolLM2-135M"
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--mode", choices=("mixed", "no_mixing", "real_six", "real_six_no_mixing"), default="mixed")
+    parser.add_argument("--mode", choices=("mixed", "no_mixing", "real_six", "real_six_no_mixing", "real_equivalent", "real_equivalent_no_mixing", "real_matched_orthogonal", "real_matched_orthogonal_no_mixing"), default="mixed")
     parser.add_argument("--rank", type=int, default=16)
     parser.add_argument("--residual-scale", type=float, default=0.1)
     parser.add_argument("--steps", type=int, default=2)
@@ -44,7 +44,7 @@ def main() -> None:
         MODEL_ID, use_safetensors=True, trust_remote_code=False,
         torch_dtype="auto",
     ).to(device).eval()
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=False)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=False, local_files_only=True)
     input_ids = tokenizer(
         "A scientific hypothesis needs controlled experiments and reproducible results.",
         return_tensors="pt",

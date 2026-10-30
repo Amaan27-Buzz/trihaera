@@ -167,6 +167,32 @@ python scripts/replicate_persistent.py --device cuda --seeds 17,23,42 --steps 10
 
 This trains all four persistent variants on matched token exposures. It is an **early structural comparison**, not a compute-matched architecture win. See [persistent-state research](docs/PERSISTENT_STATE.md).
 
+## 2026-10-30: twelve-run persistent-state results and exact real control
+
+Your RTX 5060 completed **60 tests** and three seeds × four 100-step training variants on WikiText-2 (64 validation windows):
+
+| Persistent-state variant | Mean held-out NLL ↓ | Mean 100-step training time |
+| --- | ---: | ---: |
+| 3 complex + U(3) mixer | **3.538331** | 26.202 s |
+| 3 complex, no mixer | 3.539520 | 12.066 s |
+| Old 6-real + O(6) mixer | 3.565990 | 19.991 s |
+| Old 6-real, no mixer | 3.598689 | 7.568 s |
+
+The U(3) mixer wins on held-out NLL by only **0.001188** versus the same complex architecture without mixing, while consuming **2.17× training time**. Real-six models use different initial state embeddings and injection rules; **their gap must not be credited to complex arithmetic or interference**.
+
+**New stronger controls:** `real_equivalent` represents exactly the *same* complex computation through six ordinary real channels. `real_matched_orthogonal` uses the same phases, gains and initial state but allows a wider real O(6) mixer instead of the structured U(3). Numerical forward/gradient equivalence is unit-tested. Both remain pretrained **sidecars**, not integrated attention or scratch-trained TRIHAERA.
+
+Run the next comparison using your already cached model and WikiText-2 data:
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/replicate_persistent.py --device cuda --modes mixed,no_mixing,real_equivalent,real_matched_orthogonal --seeds 17,23,42 --steps 100 --eval-windows 64 --output artifacts/real_matched_replication_135m.json
+```
+
+Differences between `mixed` and `real_equivalent` should be only floating-point numerical noise; persistent differences signal a bug. The O(6) comparator starts from the same complex-equivalent state but can learn a wider range of rotations. **Neither 100-step token matching nor apparent faster math is a claim of compute-matched quality.**
+
 ## Evaluation standard
 
 Measure trainable parameters, FLOPs, training tokens, validation loss, inference latency, throughput and VRAM separately. Include dense, recurrent/shared-weight and interference-disabled baselines; predeclare meaningful thresholds and avoid cherry-picking. A negative research outcome is valid. **Do not claim quantum speedups or model-quality gains without evidence.**

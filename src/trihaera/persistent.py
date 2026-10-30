@@ -18,8 +18,9 @@ from torch import nn
 from torch.nn import functional as F
 
 from .layers import PhaseInterference, shared_complex_linear
+from .real_equivalent import RealEquivalentStep
 
-PersistentMode = Literal["mixed", "no_mixing", "real_six", "real_six_no_mixing"]
+PersistentMode = Literal["mixed", "no_mixing", "real_six", "real_six_no_mixing", "real_equivalent", "real_equivalent_no_mixing", "real_matched_orthogonal", "real_matched_orthogonal_no_mixing"]
 
 
 class PersistentStep(nn.Module):
@@ -130,7 +131,7 @@ class PersistentStateAdapterLM(nn.Module):
     def __init__(self, backbone: nn.Module, *, rank: int = 16,
                  mode: PersistentMode = "mixed", residual_scale: float = 0.1) -> None:
         super().__init__()
-        if mode not in ("mixed", "no_mixing", "real_six", "real_six_no_mixing"):
+        if mode not in ("mixed", "no_mixing", "real_six", "real_six_no_mixing", "real_equivalent", "real_equivalent_no_mixing", "real_matched_orthogonal", "real_matched_orthogonal_no_mixing"):
             raise ValueError("Unsupported persistent sidecar mode")
         if rank < 1 or not 0 < residual_scale <= 1 or not math.isfinite(residual_scale):
             raise ValueError("Invalid rank/residual scale")
@@ -153,7 +154,10 @@ class PersistentStateAdapterLM(nn.Module):
         device = output.weight.device
         self.steps = nn.ModuleList([
             (RealSixChannelStep(width, rank, mixing=(mode == "real_six"))
-             if mode.startswith("real_six") else PersistentStep(width, rank, mode))
+             if mode.startswith("real_six") else (
+                RealEquivalentStep(width, rank, mode)
+                if mode.startswith(("real_equivalent", "real_matched_orthogonal"))
+                else PersistentStep(width, rank, mode)))
             .to(device=device)
             for _ in range(len(layers))
         ])
@@ -182,7 +186,10 @@ class PersistentStateAdapterLM(nn.Module):
             state = step(layer_hidden, state)
         assert state is not None
         merged = (state.sum(dim=2).real / math.sqrt(3)
-                  if state.is_complex() else state.sum(dim=2) / math.sqrt(6))
+                  if state.is_complex() else (
+                    state[:, :, :3, :].sum(dim=2) / math.sqrt(3)
+                    if self.mode.startswith(("real_equivalent", "real_matched_orthogonal"))
+                    else state.sum(dim=2) / math.sqrt(6)))
         projected = self.readout(merged) * self.residual_scale
         head = self.backbone.get_output_embeddings()
         correction = F.linear(projected.to(head.weight.dtype), head.weight)

@@ -65,3 +65,14 @@ The variants are still not FLOP matched and have a small parameter-count differe
 Model: frozen SmolLM2-135M Base on owner's 8GB CUDA RTX 5060. Training: WikiText-2 official train split, held-out pilot validation from official validation split, identical tokenizer, packed windows, seeds, steps, learning rate and gradient clipping. Controls: complex depth-persistent `mixed`, complex depth-persistent `no_mixing`, 6-real-channel recurrent `real_six` and `real_six_no_mixing`.
 
 For each seed log initial zero-readout parity, trainable params, final validation NLL, step-loss endpoints, gradient norms, measured training time and peak CUDA memory. Summarize paired differences against complex no-mixing; inspect **real-six** comparisons explicitly. This is an *experimental pilot*, NOT equal-FLOP or confidence-calibrated evidence. The O(6) real mixing group is a stronger comparator than U(3) in terms of possible 6-real-dimensional rotations. Follow with timing/FLOP-matched and additional datasets **only if** the persistent design earns further investigation.
+
+## October 30 next falsification: exact-real and matched O(6)
+
+**Existing owner results:** persistent mixed NLL 3.538331 vs no-mixing 3.539520 (3 seeds; 100 steps; 64 validation windows), requiring 26.20 vs 12.07 seconds of training. Prior independent 6-real baselines used differently initialized input states, so they do not isolate complex arithmetic.
+
+New controls:
+- `real_equivalent`: exact 6-real representation of mixed complex U(3), same state injection, same weights. At matched initial weights should reproduce **forward logits and gradients** within floating-point tolerance; meaningful quality difference is a bug or numerical-training divergence.
+- `real_matched_orthogonal`: same 6-real state initialization and all other operators as complex, but O(6) learns rotations beyond U(3). It starts from the equivalent U(3) transform to isolate learned mixing capacity rather than initialization.
+- Include `mixed` and `no_mixing` for continuity with prior runs.
+
+Use identical train and validation packed tokens, 100 steps, seeds 17/23/42 and document per-mode trainable parameters and time. The experiment remains **not FLOP-matched**, even though raw real state width is now comparable. A claim of increased capability requires multi-dataset testing, stronger transformer/recurrent baselines, and matched training compute.
