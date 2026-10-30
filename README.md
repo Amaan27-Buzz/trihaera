@@ -211,6 +211,21 @@ python scripts/smoke_feedback.py --device cuda --mode real_matched_orthogonal --
 
 This test checks **exact initial pretrained parity**, training gradients through frozen decoder blocks, peak VRAM, and absence of state leakage. It is **not a quality test**. Read [latest research analysis](docs/FEEDBACK_RESEARCH.md).
 
+## Latest: inter-layer feedback GPU validation and held-out pilot
+
+The owner's RTX 5060 passed all **77 tests** and three real-model feedback smokes with **zero initial pretrained-logit differences**. The U(3), no-mixer and matched O(6) versions trained for two steps at only nine tokens. That confirms integration, not language quality or 128-token VRAM requirements.
+
+The new **feedback** experiment measures held-out WikiText-2 next-token NLL and synchronized step times at a more realistic sequence length. First run the short 128-token gate; only after that passes, run the three-seed comparison. Read [feedback research](docs/FEEDBACK_RESEARCH.md) and [project status](docs/PROJECT_STATE.md).
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/replicate_feedback.py --device cuda --seeds 17 --steps 10 --sequence-length 128 --eval-windows 32 --output artifacts/feedback_gate_128.json
+# After confirmed gate:
+python scripts/replicate_feedback.py --device cuda --seeds 17,23,42 --steps 40 --sequence-length 128 --eval-windows 64 --output artifacts/feedback_replication_135m.json
+```
+
 ## Evaluation standard
 
 Measure trainable parameters, FLOPs, training tokens, validation loss, inference latency, throughput and VRAM separately. Include dense, recurrent/shared-weight and interference-disabled baselines; predeclare meaningful thresholds and avoid cherry-picking. A negative research outcome is valid. **Do not claim quantum speedups or model-quality gains without evidence.**

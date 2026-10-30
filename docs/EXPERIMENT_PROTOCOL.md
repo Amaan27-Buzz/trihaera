@@ -84,3 +84,9 @@ The next experiment is an **engineering compatibility** gate, not a performance 
 Compare a complex U(3) and an initialization-matched real O(6) feedback mode, with no-mixing retained in source. Require exact initial logit parity, causal prefix, no original-weight updates, nonzero feedback gradients, bounded memory on 8GB RTX 5060, and no state leakage across calls/errors. Do not infer architecture quality from two optimizer steps.
 
 If compatibility passes: measure held-out NLL and time/VRAM with synchronized warm repetitions, param/compute accounting, and a stronger real-valued shared-weight control *before* deciding whether to train at wider scale.
+
+## Integrated feedback 128-token staged held-out pilot
+
+Following the owner's 2026-10-30 correct 9-token GPU smokes for U(3), no-mix, and matched O(6), run `scripts/replicate_feedback.py` with seed 17, 10 optimizer steps, sequence length 128 and 32 validation windows. Reject and investigate any out-of-memory, nonfinite loss, mismatched initial frozen-base validation loss or unexpected state leakage. On pass, run seeds 17,23,42 for 40 steps at 128 tokens and 64 validation windows.
+
+The script uses identical sampled token windows across modes, common per-seed randomization, warmed training calls without optimizer updates, synchronized per-step timing and recorded peak allocated/reserved CUDA memory. Rotate mode order to reduce systematic scheduling bias. The experiment *still lacks matched FLOPs and wall-clock budgets*; no claims of broader capability or quantum advantage are permitted.

@@ -45,3 +45,7 @@ Conclusions must be revisable based on results, including negative ones. No fabr
 | T-030 | No claimed U(3) advantage over matched-start O(6) | O(6) has slightly better NLL on all three seeds, −0.000809 mean; 540 extra weights and small sample | New matched-compute, multi-data controls |
 | T-031 | Prioritize integrated hidden-stream feedback over more detached-sidecar sweeps | Existing sidecar cannot modify pretrained attention; mixer win tiny and not efficiency-proven | Correctness or 8GB memory gate fails |
 | T-032 | Treat current wall-clock comparisons as untrustworthy for kernel ranking | Run times varied dramatically for same mode/steps; likely system variability but no diagnosed cause | Synchronized repeated warm measurements and measured FLOPs |
+
+| T-033 | Accept inter-layer feedback correctness on RTX 5060, without quality claim | All 3 modes passed exact zero-adapter logit parity and two finite-gradient steps, 9-token input | Failure at practical sequence length or held-out evaluation |
+| T-034 | Gate 128-token integration before longer comparison | 9-token peak memory and two-step timings do not predict 128-token backward costs | Validated memory/timing at longer contexts |
+| T-035 | Use fixed per-seed schedules and warmed synchronized step timings | Prior per-mode wall time suffered host/GPU stalls and misleading averages | Better GPU profiling and an eventual FLOP/time-matched training protocol |
