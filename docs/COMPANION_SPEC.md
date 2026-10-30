@@ -137,3 +137,19 @@ the correct behavior. The ongoing experience remains one chat; benchmark
 databases are independent synthetic fixtures, not new product chat threads.
 
 See [EVALUATION_FINDINGS.md](EVALUATION_FINDINGS.md).
+
+## Capacity-isolation next step
+
+As of owner v3, 360M had every expected source in the available prompt
+but only 7/10 correct literal recalls; it failed to resolve "my" in a
+user-name question and generalized a keyboard-focus bug into generic
+onboarding language. The 1.7B SmolLM2-Instruct checkpoint is now an
+explicit first local capacity baseline rather than adding more brittle
+per-question prompt rules.
+
+The new comparison uses **fixed identical prompt text** (not separate
+generated histories), tracked by content hash. It must measure both
+model sizes with raw output, incorrect-date/contact flags, exact
+source availability, latency, and CUDA peak allocation. Such a replay
+cannot by itself validate a natural long-lived companion: subsequent
+interactive testing remains required.

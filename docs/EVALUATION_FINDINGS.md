@@ -45,3 +45,39 @@ python scripts/evaluate_companion.py --device cuda --offline --output artifacts/
 Compare individual answers, exact source IDs and raw/served outputs to the prior v2 reports. Passing CPU tests is not a GPU language-quality result.
 
 If the same two wrong-topic failures persist, compare SmolLM2-1.7B-Instruct on the same local GPU (model option supported by scripts), then consider more substantive memory extraction/re-ranking. Do not invent training or fine-tuning benefit in advance. LRA remains **one continuous companion chat**, not multiple sessions.
+
+## October 30 owner v3 results and next falsification
+
+**New measured full v3:** 7/10 automated literal answers (v2: 8/10),
+10/10 expected sources available, 0 grounding overrides. Quick v3:
+3/5 compared with 5/5 in v2. The `Regarding entry 099` synthetic
+prefix disappeared, but name-pronoun confusion worsened. In the full
+test: `corrected_name` responded with LRA identity, `corrected_name_restart`
+also identified LRA instead of Morgan, and `recent_resume` gave
+generic onboarding advice rather than identifying the keyboard focus bug.
+The later `old_vs_current` returned `[profile:name: Morgan]` and was
+counted as literally correct, though unnatural for a companion.
+
+The unknown-fact prompt still hallucinated an exact date:
+`October 30, 2026`. A previous rule only recognized numerical
+ISO-like dates. **Do not count absent grounding overrides as proof
+of good behavior.** A missing value may be present in the current
+prompt context, yet the tiny model can fail to utilize it.
+
+### Controlled comparison, before more memory reengineering
+
+`scripts/compare_smollm.py` now compares 360M vs 1.7B using
+exactly the same recorded prompt text and scripted synthetic history.
+Its unknown-detail checks detect written calendar dates, numeric dates,
+phone-like strings and email addresses. They report *flags*, not
+automated factual adjudications. CPU regression tests require fixed
+source coverage and deterministic prompt snapshots.
+
+Unlike `scripts/evaluate_companion.py`, the fixed-prompt comparison
+does not write generated assistant answers back into the history; this
+eliminates one major confound when comparing model capacities.
+If it establishes a reproducible advantage for 1.7B, run the
+end-to-end benchmark separately using its `--model` option.
+
+No training, fine-tuning, new memory architecture or measured 1.7B
+results are claimed at this stage.

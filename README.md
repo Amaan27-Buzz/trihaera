@@ -235,6 +235,53 @@ python scripts/evaluate_companion.py --device cuda --offline --output artifacts/
 
 See [the measured results and limitations](docs/EVALUATION_FINDINGS.md).
 
+## Capacity checkpoint: fixed-prompt SmolLM2 comparison
+
+**2026-10-30 owner v3 GPU results:** full synthetic benchmark measured
+**7/10** literal answers correct (down from v2's 8/10), with **10/10**
+expected sources present. Incorrect answers misidentified the user's
+corrected name as LRA and reduced an unresolved keyboard-focus bug to
+generic onboarding advice. The small model also invented a presentation
+date in words, which bypassed the prototype's numeric-only date guard.
+The copied `Regarding entry 099` prefix disappeared. These findings
+do **not** establish that adding more retrieval heuristics will help.
+
+We now freeze the LRA context builder and compare **two SmolLM2 Instruct
+models** using identical textual snapshots from one scripted continuing
+conversation (including 100 filler pairs, correction, and restart):
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+
+# Initial comparison: 6 probes on both 360M and 1.7B.
+# Do NOT add --offline on first use: the 1.7B weights must download.
+python scripts/compare_smollm.py --device cuda --quick --output artifacts/lra_smol_quick_comparison.json
+
+# Only after resource compatibility: 12 probes, identical prompt content.
+python scripts/compare_smollm.py --device cuda --output artifacts/lra_smol_full_comparison.json
+```
+
+The larger checkpoint is `HuggingFaceTB/SmolLM2-1.7B-Instruct`. Its
+BF16 parameter weights are about 3.4 GB and its configured context length
+is 8,192 tokens. On an 8GB RTX 5060 this is a reasonable inference trial,
+but memory usage must be measured. Model downloads only; **no training**.
+You can add `--offline` once both checkpoints are cached.
+
+The comparison runner constructs the same chronological **synthetic**
+user/assistant history for both models. It captures each prompt **before
+generating** with either model, so unlike a normal conversation, one
+model's replies cannot change the other's evidence. Each result records
+literal correctness, source presence, latency, VRAM, and *separate*
+flags for fabricated-looking dates or contact details. The latter are
+format checks requiring human review, not a comprehensive fact checker.
+
+This is a **model-capacity control**, not the final interactive companion
+test. If 1.7B does better, rerun the actual `evaluate_companion.py`
+end-to-end benchmark with `--model HuggingFaceTB/SmolLM2-1.7B-Instruct`
+to verify it carries over when past assistant replies are model-generated.
+
 ## Engineering and research
 
 See [COMPANION_SPEC.md](docs/COMPANION_SPEC.md) for the product definition,
