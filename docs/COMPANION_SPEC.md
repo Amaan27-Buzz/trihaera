@@ -76,3 +76,29 @@ must be expanded before sensitive personal deployment.
 The old TRIHAERA code is removed from the active branch tree and retained
 in Git history for reproducibility. All active LRA code is on `main`.
 Use existing independent Windows CUDA environment without modifying Levis.
+
+## Evaluation milestone — multi-turn, single-companion tests
+
+The first companion quality check is the reproducible
+`scripts/evaluate_companion.py` harness. It generates actual SmolLM answers
+across a continuing SQLite history, includes more than 200 synthetic
+distractor turns and verifies the same history survives a restart.
+
+**Critically, evaluation separates three quantities:**
+1. Whether the relevant original messages or corrected active memories were
+   accessible in the *actual* bounded model prompt.
+2. Whether the model's output contains each predeclared expected fact; checks
+   are literal and may miss valid paraphrases.
+3. Whether the output is trustworthy, appropriately uncertain, natural and
+   companion-like; subjective and unknown-fact cases must be reviewed by a
+   human, not counted as automatically correct.
+
+A scripted history with known answers is a debugging baseline, not a proof
+of autonomous long-term memory. Future milestones require natural dialogue,
+temporal and emotional context, conflicting beliefs, open-thread continuity,
+robust corrections, opt-in memory deletion and non-synthetic human trials.
+
+The six-question quick path is `--quick`; use the default 12 scored probes
+for the complete diagnostic. Both generate additional setup replies through
+the real SmolLM model. Benchmark data is **strictly separate from the one
+personal LRA conversation**, and stored report content is synthetic.

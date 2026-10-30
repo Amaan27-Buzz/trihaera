@@ -26,6 +26,8 @@ class ContextPlan:
     messages: list[dict]
     retrieved_ids: tuple[int, ...]
     memory_keys: tuple[str, ...]
+    recent_ids: tuple[int, ...]
+    memory_source_ids: tuple[int, ...]
     input_tokens: int
     truncated: bool
 
@@ -97,6 +99,8 @@ def build_context(history: History, query: str, *, token_count,
         messages=prompt,
         retrieved_ids=tuple(m["id"] for m in retrieved),
         memory_keys=tuple(m["key"] for m in memories),
+        recent_ids=tuple(m["id"] for m in included),
+        memory_source_ids=tuple(m["source_message_id"] for m in memories),
         input_tokens=tokens,
         truncated=dropped,
     )

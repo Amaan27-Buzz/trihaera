@@ -124,6 +124,52 @@ been stress-tested for millions of messages.
   settings; do not use v0.1 for sensitive data you cannot safeguard.
 - LRA does not run in the background and will not contact you proactively.
 
+## Multi-prompt companion evaluation
+
+The single-prompt GPU smoke is only a startup check. To evaluate whether
+LRA actually behaves like **one continuing companion**, use the scripted,
+isolated multi-prompt evaluation.
+
+```powershell
+cd 'D:\Programming\03_Projects\personal-projects\05_ML\trihaera'
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+
+# First: 6 scored questions plus setup turns; model already downloaded.
+python scripts/evaluate_companion.py --device cuda --offline --quick --output artifacts/lra_eval_quick.json
+
+# Then: all 12 scored questions, 100 pairs of synthetic filler turns,
+# one memory correction and a database restart.
+python scripts/evaluate_companion.py --device cuda --offline --output artifacts/lra_eval_full.json
+```
+
+The benchmark **never edits your actual `data/lra.sqlite3` conversation**:
+by default it constructs and destroys an independent temporary SQLite
+journal. Pass `--db artifacts/lra_eval_inspect.sqlite3` if you want to
+inspect its full synthetic conversation afterward; the script refuses to
+overwrite a preexisting database.
+
+It runs multiple real SmolLM generations across one growing chat, including:
+- remembering an introduced name, project milestone and stated style;
+- an older specific launch reference and reason a project was paused;
+- a direct correction of the user's name, including after database restart;
+- a multi-fact answer, an unfinished onboarding task, and questions for
+  which no factual answer was given;
+- 100 pairs of deliberately synthetic intervening user/assistant turns to
+  exceed the recent-message window without generating hundreds of tokens.
+
+`artifacts/lra_eval_full.json` preserves each actual prompt, generated
+answer, expected source IDs, source availability in the prompt, literal
+answer verdict, latency and context usage, plus aggregate numbers.
+Unknown-fact probes require **manual inspection**; literal matching can
+mis-score paraphrases. The test does not train or fine-tune SmolLM and
+must not be reported as comprehensive companion intelligence.
+
+A failure should be classified as: **source not retrieved**, **source in
+context but model ignored it**, **stale/corrected fact**, or **unclear
+answer**. Review actual model outputs before changing the architecture.
+
 ## Engineering and research
 
 See [COMPANION_SPEC.md](docs/COMPANION_SPEC.md) for the product definition,
