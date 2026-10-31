@@ -312,3 +312,67 @@ A list of only configuration/tokenizer metadata or `[]` means the
 safetensors weights aren't locally cached in the default Hugging Face
 cache. Listing weights means some weight files are present, not
 necessarily that every shard has downloaded.
+
+## Baseline findings and next profiling gate — owner RTX 5060, 2026-10-31
+
+Owner GPU runs completed successfully using official unmodified checkpoints,
+greedy decoding and up to 96 generated tokens. **17 CPU tests passed**.
+
+| Metric | SmolLM2-360M | Qwen3.5-0.8B |
+| --- | ---: | ---: |
+| Completed cases | 16 | 15 |
+| Automatic diagnostic success | 7/13 | 8/12 |
+| 512-token native-context probe | Pass | Pass |
+| 2048-token native-context probe | Pass | Not yet run |
+| Typical short-prompt CUDA allocated peak | ~740 MiB | ~1717 MiB |
+| Maximum observed CUDA allocated peak | ~868 MiB | ~1781 MiB |
+
+The different total counts must **not** be compared as equivalent
+samples. Both models also require manual review of their deep-learning,
+advice, and underspecified-research responses. Qwen showed strength
+on the synthetic name correction, two-fact answer and JSON format,
+while SmolLM handled the specific unfinished keyboard-focus issue
+better. This is not strong enough evidence to train only Qwen yet.
+
+**Qwen still used slow PyTorch fallback implementations** for gated
+linear-attention and causal-convolution operations. Official
+[Hugging Face architecture guidance](https://huggingface.co/docs/transformers/model_doc/qwen3_5)
+documents optimized `causal_conv1d` and `fla` paths, but Windows
+build compatibility is not guaranteed and careless pip installation
+can replace working Torch/Triton builds. Keep this environment
+unchanged while profiling. No speed-up has been demonstrated yet.
+
+### Compare exactly shared raw prompts (no GPU)
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/compare_baselines.py --smol artifacts/baseline_smol_fixed.json --qwen artifacts/baseline_qwen_fixed.json --output artifacts/baseline_paired_comparison.json
+```
+
+The paired comparison checks **actual prompt text**, not just nominal
+scenario IDs; synthetic needle fillers can tokenize differently and
+are excluded from the fully paired metric when text differs. Model
+decoding, seed, device and output budgets are checked for differences.
+
+### Profile Qwen's existing (unoptimized) inference path
+
+This uses **only cached weights and existing dependencies**:
+
+```powershell
+python scripts/profile_inference.py --model qwen --device cuda --offline --targets 128,512,2048 --decode-tokens 32 --repeats 3 --output artifacts/profile_qwen_reference.json
+python scripts/profile_inference.py --model smol --device cuda --offline --targets 128,512,2048 --decode-tokens 32 --repeats 3 --output artifacts/profile_smol_reference.json
+```
+
+The profiler warms each shape, synchronizes CUDA, measures a
+forward-only prefill separately and a fixed-length cached generation
+run. It reports medians, individual times and VRAM. Fixed output
+length is for compute measurements **not model-answer quality**.
+
+**Stop/go after profiling:** if Qwen wins materially on relevant
+dialogue quality but its kernels are slow, plan a separate
+dependency-pinned kernel experiment with reproducibility and
+correctness comparisons. Otherwise prioritize data/behavioral
+training and evaluation rather than speculative kernel work.
+No harness or UI is being developed in this phase.
