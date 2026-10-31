@@ -282,6 +282,21 @@ test. If 1.7B does better, rerun the actual `evaluate_companion.py`
 end-to-end benchmark with `--model HuggingFaceTB/SmolLM2-1.7B-Instruct`
 to verify it carries over when past assistant replies are model-generated.
 
+## Search-native SmolLM research (optional, not the default chat)
+
+We are testing a new **trained search-and-grounding capability** for
+SmolLM2-360M rather than only attaching a web search API. The initial
+research branch is implemented on `main`, but is **isolated from the
+single-companion chat**. It trains LoRA adapters to decide when to answer,
+search, or abstain and to use source IDs when evidence is supplied.
+
+**No Google AI Overview performance claim has been established.**
+The first corpus is deliberately small and synthetic; results must
+be evaluated on held-out, real sourced questions before deployment.
+
+For experiment protocol, Windows/RTX 5060 commands and limitations,
+read [SEARCH_NATIVE_RESEARCH.md](docs/SEARCH_NATIVE_RESEARCH.md).
+
 ## Engineering and research
 
 See [COMPANION_SPEC.md](docs/COMPANION_SPEC.md) for the product definition,
