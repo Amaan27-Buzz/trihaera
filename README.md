@@ -214,3 +214,56 @@ Locally ignored environments, model caches, databases and experiment outputs are
 **Build order: Model → Harness → Web → Desktop → Mobile.**
 
 **Success criterion:** a genuinely useful, efficient, retrained conversational model and a trustworthy product built around it—not a benchmark score, a search wrapper, or a polished UI alone.
+
+## Phase 1 baseline implementation — 2026-10-31
+
+**Engineering checkpoint, not trained-model results.** The repository now contains only a reproducible raw baseline harness, synthetic diagnostics, documentation and CPU tests. No training pipeline, multi-chat harness, or web app has been introduced.
+
+The two models are loaded using their **official** Transformers entry points:
+
+- SmolLM2-360M-Instruct: `AutoTokenizer` + `AutoModelForCausalLM`.
+- Qwen3.5-0.8B: `AutoProcessor` + `AutoModelForMultimodalLM` (the published model is multimodal; this experiment sends **text only**). A recent Transformers installation supporting the latter is required.
+
+**Reference:** [SmolLM2 model card](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct) and [Qwen3.5 model card](https://huggingface.co/Qwen/Qwen3.5-0.8B). This script uses standard PyTorch eager inference first; optimization follows actual measurements.
+
+### Local RTX 5060 runbook (Windows PowerShell)
+
+The earlier project virtual environment already has CUDA-capable PyTorch and Transformers 5.x. Keep that environment; do not reinstall the entire CUDA stack for this small baseline.
+
+```powershell
+cd 'D:\Programming\03_Projects\personal-projects\05_ML\trihaera'
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python -m pip show torch transformers
+
+# Test the already-cached 360M model; short native-context probes.
+python scripts/benchmark_models.py --model smol --device cuda --offline --output artifacts/baseline_smol_greedy.json
+
+# Official Qwen3.5-0.8B checkpoint; allow first-time download.
+python scripts/benchmark_models.py --model qwen --device cuda --output artifacts/baseline_qwen_greedy.json
+```
+
+If Qwen's official `AutoProcessor` reports a missing vision dependency, inspect the error and install only the specific missing dependency rather than replacing your working PyTorch. If the installed Transformers lacks `AutoModelForMultimodalLM`, report its version first. Inference quality from **greedy** decoding may be lower than vendor-recommended sampling for Qwen; this setting is primarily a repeatable profiling baseline.
+
+For a vendor-style non-thinking **sampling** comparison (separate results, not directly comparable to greedy; Qwen defaults to non-thinking), run:
+
+```powershell
+python scripts/benchmark_models.py --model smol --device cuda --offline --decoding recommended --output artifacts/baseline_smol_sampling.json
+python scripts/benchmark_models.py --model qwen --device cuda --offline --decoding recommended --output artifacts/baseline_qwen_sampling.json
+```
+
+**What's measured:** per-prompt raw output and heuristic/manual scoring, full generation wall time, a separate one-token generation probe (includes prefill, not a true streaming TTFT), token throughput including prefill, peak GPU allocated/reserved bytes, model load time, model revision, Torch/Transformers versions and GPU model. Results are JSON and written after each completed prompt so a later failure does not destroy earlier results.
+
+**What's not measured yet:** live search effectiveness, long-term cross-chat memory, generative UI, context-health calibration, native 128K/262K behavior, training improvements, or objective hallucination probability. A 512/2048-token in-window needle test does **not** establish context extension.
+
+The small fixed-prompt battery is a **diagnostic**, not a published evaluation or training corpus. All examples use synthetic content and must remain outside model-training data. Next milestone: review these raw results, establish richer held-out sourced benchmarks, then build the first actual supervised training and inference-optimization track.
+
+### Files
+
+- `scripts/benchmark_models.py` — reference-model GPU runner with incremental JSON results.
+- `src/model_lab/catalog.py` — explicit official checkpoints and loader families.
+- `src/model_lab/cases.py` — transparent synthetic diagnostic cases.
+- `src/model_lab/scoring.py` — limited auto-scoring and manual-review markers.
+- `tests/test_model_lab.py` — CPU protocol regressions, no weights downloaded.
+

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dawnlight-conversational-model-lab"
+version = "0.1.0"
+description = "Reproducible model-first local conversational AI research"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+inference = ["transformers>=5.9,<6", "torch>=2.2", "safetensors>=0.4", "accelerate>=1.0", "pillow>=10"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
