@@ -25,7 +25,7 @@ def assess(case: Case, answer: str) -> dict:
     elif kind == "abstain":
         uncertain = bool(re.search(
             r"\b(?:don't|do not|cannot|can't|not provided|not shared|never shared|"
-            r"no information|unsure|unknown|haven't been told)\b", answer, re.I
+            r"no information|unsure|unknown|never gave|haven't been told)\b", answer, re.I
         ))
         invented = bool(re.search(
             r"\b\d{4}-\d\d-\d\d\b|\b\d{3}[- ]\d{3}[- ]\d{4}\b|"
