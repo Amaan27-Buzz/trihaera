@@ -52,24 +52,26 @@ def load_reference(spec, device: str, offline: bool):
         )
         formatter = tokenizer
     elif spec.loader == "multimodal":
-        # Official Qwen3.5 model card: AutoProcessor and AutoModelForMultimodalLM.
-        # Do not silently substitute a third-party converted checkpoint.
+        # Text-only input to the OFFICIAL full Qwen3.5 checkpoint.
+        # AutoProcessor initializes a video processor requiring Torchvision,
+        # even though no image/video is supplied. Loading the tokenizer by
+        # itself avoids that unnecessary dependency and retains the exact
+        # original multimodal model weights.
         try:
-            from transformers import AutoModelForMultimodalLM, AutoProcessor
+            from transformers import AutoModelForMultimodalLM, AutoTokenizer
         except ImportError as exc:
             raise RuntimeError(
-                "Qwen3.5 requires a recent Transformers 5.x with "
-                "AutoModelForMultimodalLM; inspect your installed version."
+                "Qwen3.5 requires Transformers with "
+                "AutoModelForMultimodalLM support."
             ) from exc
-        processor = AutoProcessor.from_pretrained(
+        tokenizer = AutoTokenizer.from_pretrained(
             spec.model_id, local_files_only=offline, trust_remote_code=False
         )
         model = AutoModelForMultimodalLM.from_pretrained(
             spec.model_id, local_files_only=offline, trust_remote_code=False,
             use_safetensors=True, dtype=dtype
         )
-        tokenizer = processor.tokenizer
-        formatter = processor
+        formatter = tokenizer
     else:
         raise ValueError("Unknown model loader")
     model = model.to(device).eval()
@@ -86,21 +88,45 @@ def encode(formatter, messages, device):
     return payload.to(device)
 
 
-def build_needle(formatter, target: int):
-    filler = ""
-    for idx in range(max(20, target // 4)):
-        filler += f"Notebook entry {idx}: I took a walk and made dinner. "
-        case = needle_case(target, filler)
-        # Official chat formatting determines actual native token length.
-        payload = formatter.apply_chat_template(
-            case.chat(), tokenize=True, add_generation_prompt=True,
-        )
-        token_ids = payload["input_ids"] if isinstance(payload, dict) else payload
-        length = len(token_ids)
-        if length >= target:
-            return case
-    raise RuntimeError("Unable to construct diagnostic context probe")
+def count_chat_tokens(formatter, messages) -> int:
+    """Count ACTUAL model-ready token IDs, not batch/dictionary outer length."""
+    payload = formatter.apply_chat_template(
+        messages, tokenize=True, add_generation_prompt=True,
+        return_dict=True, return_tensors="pt",
+    )
+    ids = payload["input_ids"]
+    if hasattr(ids, "shape"):
+        return int(ids.shape[-1])
+    if isinstance(ids, (list, tuple)) and ids and isinstance(ids[0], (list, tuple)):
+        return len(ids[0])
+    return len(ids)
 
+
+def build_needle(formatter, target: int):
+    """Construct the smallest repeated diary filling at least target tokens.
+
+    Exponential search then binary search is fast and avoids tokenizing an
+    ever-growing string hundreds of times. It works for different model
+    tokenizers and doesn't presume tokens per English sentence.
+    """
+    if target < 128:
+        raise ValueError("Context target must be >=128 tokens")
+    segment = "Diary note: I walked in the park and cooked dinner afterward. "
+    def candidate(repetitions: int):
+        return needle_case(target, segment * repetitions)
+    low, high = 0, 1
+    while count_chat_tokens(formatter, candidate(high).chat()) < target:
+        low, high = high, high * 2
+        if high > 100000:
+            raise RuntimeError("Tokenizer cannot reach target context length")
+    # Find first length >= target; minimize accidental context-window overrun.
+    while low + 1 < high:
+        mid = (low + high) // 2
+        if count_chat_tokens(formatter, candidate(mid).chat()) >= target:
+            high = mid
+        else:
+            low = mid
+    return candidate(high)
 
 def sync(device: str):
     if device == "cuda":

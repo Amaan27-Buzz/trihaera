@@ -267,3 +267,48 @@ The small fixed-prompt battery is a **diagnostic**, not a published evaluation o
 - `src/model_lab/scoring.py` — limited auto-scoring and manual-review markers.
 - `tests/test_model_lab.py` — CPU protocol regressions, no weights downloaded.
 
+
+## Baseline loading fix — 2026-10-31
+
+Two owner GPU failures on first run were engineering issues:
+
+1. SmolLM2 model weights loaded successfully, but context-probe generation
+   failed before any scored questions. The previous generator used a
+   tokenizer-dependent outer length and a fixed loop rather than counting
+   the actual batch's input IDs. It now uses `return_dict=True`,
+   `return_tensors='pt'`, `input_ids.shape[-1]`, and a bounded
+   exponential/binary search for the target length.
+2. Qwen3.5-0.8B downloaded tokenizer/config/processor metadata but failed
+   during `AutoProcessor.from_pretrained` because the optional video
+   processor requires Torchvision. **Text-only input does not need that
+   processor.** The runner now loads `AutoTokenizer` while keeping the
+   original `AutoModelForMultimodalLM` official checkpoint, rather than
+   downloading a conversion or replacing working CUDA packages.
+
+These fixes are CPU-testable, but actual GPU checkpoint loading and context
+behavior are still pending verification by the owner. If Qwen fails when
+loading `AutoModelForMultimodalLM` itself, capture the complete error; do
+not automatically reinstall a different PyTorch CUDA stack.
+
+Previous failed output JSON files may already exist, and the runner refuses
+to overwrite them. Use fresh output paths:
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+python -m pytest -q
+python scripts/benchmark_models.py --model smol --device cuda --offline --output artifacts/baseline_smol_fixed.json
+python scripts/benchmark_models.py --model qwen --device cuda --context-targets 512 --output artifacts/baseline_qwen_fixed.json
+```
+
+To inspect **actual local Qwen checkpoint weight availability** without
+triggering a download:
+
+```powershell
+python -c "from huggingface_hub import scan_cache_dir; repos=[r for r in scan_cache_dir().repos if r.repo_id=='Qwen/Qwen3.5-0.8B']; print([(f.file_name, round(f.size_on_disk/1048576,1)) for r in repos for v in r.revisions for f in v.files if f.file_name.endswith('.safetensors')])"
+```
+
+A list of only configuration/tokenizer metadata or `[]` means the
+safetensors weights aren't locally cached in the default Hugging Face
+cache. Listing weights means some weight files are present, not
+necessarily that every shard has downloaded.
