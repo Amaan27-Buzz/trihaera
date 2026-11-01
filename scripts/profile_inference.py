@@ -102,6 +102,8 @@ def main():
     p.add_argument("--model", choices=("smol", "qwen"), required=True)
     p.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     p.add_argument("--offline", action="store_true")
+    p.add_argument("--model-root", type=Path, default=Path("hf"),
+                   help="Project-local Hugging Face model root")
     p.add_argument("--targets", default="128,512,2048")
     p.add_argument("--decode-tokens", type=int, default=32)
     p.add_argument("--repeats", type=int, default=3)
@@ -127,6 +129,7 @@ def main():
     report = {
         "kind": "original_checkpoint_pytorch_kernel_path_profile",
         "model": spec.model_id, "device": args.device,
+        "local_model_root": str(args.model_root.resolve()),
         "torch": torch.__version__, "transformers": transformers.__version__,
         "gpu": torch.cuda.get_device_name() if args.device == "cuda" else None,
         "requested_targets": targets, "decode_tokens": args.decode_tokens,
@@ -144,7 +147,7 @@ def main():
         output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     try:
         model, formatter, tokenizer, dtype = load_reference(
-            spec, args.device, args.offline
+            spec, args.device, args.offline, args.model_root
         )
         report["dtype"] = dtype
         for result in run_profile(

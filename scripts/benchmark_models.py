@@ -21,7 +21,7 @@ import subprocess
 import sys
 import time
 
-from model_lab.catalog import resolve_model
+from model_lab.catalog import resolve_model, verify_local_model
 from model_lab.cases import fixed_cases, needle_case
 from model_lab.scoring import assess, summarize
 
@@ -36,18 +36,25 @@ def git_revision() -> str | None:
         return None
 
 
-def load_reference(spec, device: str, offline: bool):
+def load_reference(spec, device: str, offline: bool, model_root="hf"):
+    """Load from a VERIFIED project-local directory, never HF global cache.
+
+    offline is retained for existing caller signatures; local directory
+    loading is always local_files_only=True regardless of this option.
+    """
     import torch
+    source = str(verify_local_model(spec, model_root))
+    print(f"Using project-local checkpoint: {source}", flush=True)
     dtype = (torch.bfloat16 if torch.cuda.is_available() and
              device == "cuda" and torch.cuda.is_bf16_supported()
              else torch.float16 if device == "cuda" else torch.float32)
     if spec.loader == "causal":
         from transformers import AutoModelForCausalLM, AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained(
-            spec.model_id, local_files_only=offline, trust_remote_code=False
+            source, local_files_only=True, trust_remote_code=False
         )
         model = AutoModelForCausalLM.from_pretrained(
-            spec.model_id, local_files_only=offline,
+            source, local_files_only=True,
             trust_remote_code=False, use_safetensors=True, dtype=dtype
         )
         formatter = tokenizer
@@ -65,10 +72,10 @@ def load_reference(spec, device: str, offline: bool):
                 "AutoModelForMultimodalLM support."
             ) from exc
         tokenizer = AutoTokenizer.from_pretrained(
-            spec.model_id, local_files_only=offline, trust_remote_code=False
+            source, local_files_only=True, trust_remote_code=False
         )
         model = AutoModelForMultimodalLM.from_pretrained(
-            spec.model_id, local_files_only=offline, trust_remote_code=False,
+            source, local_files_only=True, trust_remote_code=False,
             use_safetensors=True, dtype=dtype
         )
         formatter = tokenizer
@@ -197,6 +204,8 @@ def main(argv=None):
     parser.add_argument("--model", choices=("smol", "qwen"), required=True)
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     parser.add_argument("--offline", action="store_true")
+    parser.add_argument("--model-root", type=Path, default=Path("hf"),
+                        help="Local checkpoint root, with mirrored Hub repo IDs")
     parser.add_argument("--decoding", choices=("greedy", "recommended"), default="greedy")
     parser.add_argument("--max-new-tokens", type=int, default=96)
     parser.add_argument("--context-targets", default="512,2048",
@@ -229,6 +238,7 @@ def main(argv=None):
     device = args.device
     report = {
         "kind": "model_first_unmodified_reference_diagnostic",
+        "local_model_root": str(args.model_root.resolve()),
         "model": spec.model_id, "loader": spec.loader,
         "advertised_context_tokens": spec.advertised_context,
         "decoding": args.decoding, "seed": args.seed,
@@ -258,7 +268,7 @@ def main(argv=None):
     try:
         print(f"Loading {spec.model_id} on {device}...", flush=True)
         start = time.perf_counter()
-        model, formatter, tokenizer, dtype = load_reference(spec, device, args.offline)
+        model, formatter, tokenizer, dtype = load_reference(spec, device, args.offline, args.model_root)
         sync(device)
         report["model_loading_seconds"] = time.perf_counter() - start
         report["model_dtype"] = dtype

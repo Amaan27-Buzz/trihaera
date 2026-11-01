@@ -18,3 +18,4 @@ artifacts/
 *.bin
 *.pt
 *.pth
+hf/

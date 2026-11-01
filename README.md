@@ -376,3 +376,67 @@ dependency-pinned kernel experiment with reproducibility and
 correctness comparisons. Otherwise prioritize data/behavioral
 training and evaluation rather than speculative kernel work.
 No harness or UI is being developed in this phase.
+
+## Project-local Hugging Face checkpoints — November 2026
+
+The two official reference models are downloaded into the **ignored**
+project-local `hf/` directory, **not** left dependent on Hugging Face's
+default global model cache.
+
+```text
+trihaera/
+  hf/
+    HuggingFaceTB/
+      SmolLM2-360M-Instruct/
+        config.json
+        tokenizer.json
+        model.safetensors
+        ...
+    Qwen/
+      Qwen3.5-0.8B/
+        config.json
+        tokenizer.json
+        model.safetensors.index.json
+        model.safetensors-00001-of-00001.safetensors
+        ...
+```
+
+The official SmolLM2 repository also includes large unrelated ONNX
+exports and training artifacts, which are deliberately excluded. Only
+checkpoint weights, inference metadata/tokenization and licensing
+information are downloaded. This keeps both model weights at roughly
+**2.5 GB combined**, plus tokenizers and metadata. Metadata and Xet
+cache used by the download process also live under `hf/`. Do not
+commit `hf/` to Git; it is listed in `.gitignore`.
+
+Run from Windows PowerShell in the project root with the existing
+virtual environment already active:
+
+```powershell
+git pull --ff-only origin main
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+
+# Downloads both official checkpoints into ./hf, resumes/reuses local files.
+python scripts/download_models.py --models smol qwen --root hf
+
+# Purely offline check: required model files must be present.
+python scripts/download_models.py --verify-only --root hf
+
+# Profile using ONLY the project-local model folders.
+python scripts/profile_inference.py --model qwen --device cuda --offline --model-root hf --targets 128,512,2048 --decode-tokens 32 --repeats 3 --output artifacts/profile_qwen_local.json
+
+python scripts/profile_inference.py --model smol --device cuda --offline --model-root hf --targets 128,512,2048 --decode-tokens 32 --repeats 3 --output artifacts/profile_smol_local.json
+```
+
+`scripts/benchmark_models.py` also loads from these model directories
+by default, with optional `--model-root`. It refuses missing or
+incomplete local checkpoints instead of silently fetching the wrong
+revision from the web. `--offline` remains an accepted flag for
+backwards compatibility, but the model-loader itself always reads
+verified local directories.
+
+The downloader **must be run on the owner's laptop**. Committing the
+download script to GitHub does not download model weights into the
+owner's Windows filesystem. Downloading requires internet connectivity;
+later inference is local/offline. These assets are reference checkpoints,
+not models trained or optimized by Dawnlight Labs.
